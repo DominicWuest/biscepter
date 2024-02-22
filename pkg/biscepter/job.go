@@ -87,6 +87,8 @@ type Job struct {
 	DockerfilePath         string // The path to the dockerfile relative to the present working directory. Only gets used if Dockerfile is empty.
 	DockerfilePathRelative string // The path to the dockerfile relative to the project's root. Only gets used if Dockerfile and DockerfilePath are empty.
 
+	dockerfileString string
+
 	replicas []*replica // This job's replicas
 
 	repository string // The repository URL
@@ -99,6 +101,11 @@ type Job struct {
 // The [RunningSystem] channel should be used to get notified about systems which are ready to be tested.
 // Once an [OffendingCommit] was received for a given replica index, no more [RunningSystem] structs for this replica will appear in the [RunningSystem] channel.
 func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
+	// Populate job.dockerfileBytes, depending on which values were present in the config
+	if err := job.convertDockerfile(); err != nil {
+		return nil, nil, err
+	}
+
 	// Clone repo
 	var err error
 	job.repoPath, err = os.MkdirTemp("", "")
@@ -110,7 +117,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	}
 
 	// Get all commits
-	cmd := exec.Command("git", "rev-list", "--first-parent", "^"+job.GoodCommit, job.BadCommit)
+	cmd := exec.Command("git", "rev-list", "--reverse", "--first-parent", "^"+job.GoodCommit, job.BadCommit)
 	cmd.Dir = job.repoPath
 	out, err := cmd.Output()
 	if err != nil {
@@ -165,4 +172,13 @@ func (j *Job) Stop() error {
 	}
 
 	return os.RemoveAll(j.repoPath)
+}
+
+func (j *Job) convertDockerfile() error {
+	// Convert the dockerfile
+	j.dockerfileString = j.Dockerfile
+	if j.dockerfileString == "" {
+		// TODO: Read job.DockerfilePath
+	}
+	return nil
 }

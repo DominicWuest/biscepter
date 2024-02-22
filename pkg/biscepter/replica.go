@@ -1,10 +1,19 @@
 package biscepter
 
 import (
+	"context"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"path"
 	"sync"
 
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/archive"
+	"github.com/docker/go-connections/nat"
 	"github.com/moby/moby/daemon/graphdriver/copy"
 )
 
@@ -20,6 +29,8 @@ type replica struct {
 	badCommitOffset  int // The offset to the original bad commit of the oldest bad commit
 
 	waitingCond *sync.Cond // Condition variable used by goroutine created in replica.start to wait until the current commit was reported to be good or bad
+
+	ranContainers int // How many containers this replica ran. Used for naming containers
 
 	isStopped bool // Whether this replica is running
 }
@@ -85,11 +96,13 @@ func (r *replica) stop() error {
 }
 
 func (r *replica) isGood(rs RunningSystem) {
-	// TODO: Panic if called twice for same commit
+	// TODO: Panic if called twice for same commit - Also document in rs.IsGood
 	if rs.commitRootOffset < r.goodCommitOffset {
 		return
 	}
 	r.goodCommitOffset = rs.commitRootOffset + 1
+
+	rs.stop()
 
 	// Signal goroutine started in start() to wake up again
 	r.waitingCond.L.Lock()
@@ -98,11 +111,13 @@ func (r *replica) isGood(rs RunningSystem) {
 }
 
 func (r *replica) isBad(rs RunningSystem) {
-	// TODO: Panic if called twice for same commit
+	// TODO: Panic if called twice for same commit - Also document in rs.IsBad
 	if rs.commitRootOffset > r.badCommitOffset {
 		return
 	}
 	r.badCommitOffset = rs.commitRootOffset
+
+	rs.stop()
 
 	// Signal goroutine started in start() to wake up again
 	r.waitingCond.L.Lock()
@@ -113,6 +128,8 @@ func (r *replica) isBad(rs RunningSystem) {
 func (r *replica) initNextSystem() (*RunningSystem, error) {
 	nextCommit := r.getNextCommit()
 	commitHash := r.parentJob.commits[nextCommit]
+
+	fmt.Println("Testing ", commitHash)
 
 	// Checkout new commit
 	cmd := exec.Command("git", "checkout", commitHash)
@@ -128,12 +145,82 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 		return nil, err
 	}
 
+	// Create docker client
+	apiClient, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return nil, err
+	}
+	defer apiClient.Close()
+
+	// Build the new image
+	imageName := "biscepter-" + commitHash
+	// TODO: Have to ensure there is no dockerfile being overwritten in dest repo
+	os.WriteFile(path.Join(r.repoPath, "Dockerfile"), []byte(r.parentJob.dockerfileString), 0777)
+	ctx, err := archive.TarWithOptions(r.repoPath, &archive.TarOptions{})
+	if err != nil {
+		return nil, err
+	}
+	buildRes, err := apiClient.ImageBuild(context.Background(), ctx, types.ImageBuildOptions{
+		Tags: []string{imageName},
+	})
+	if err != nil {
+		return nil, err
+	}
+	// Wait for build to be done
+	_, err = io.ReadAll(buildRes.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Setup the ports
+	ports := make(map[int]int)
+
+	// Setup the container config
+	containerConfig := &container.Config{
+		Image: imageName,
+		ExposedPorts: nat.PortSet{
+			// TODO: Don't hardcode lol
+			"3333": struct{}{},
+		},
+	}
+
+	// Setup the host config
+	hostConfig := &container.HostConfig{
+		AutoRemove: true,
+		PortBindings: nat.PortMap{
+			"3333": []nat.PortBinding{
+				{
+					// TODO: Choose the host port here
+					HostPort: "3333",
+				},
+			},
+		},
+	}
+
+	ports[3333] = 3333
+
+	containerName := fmt.Sprintf("biscepter-%d-%d", r.index, r.ranContainers)
+	r.ranContainers++
+
+	// Create the new container
+	resp, err := apiClient.ContainerCreate(context.Background(), containerConfig, hostConfig, nil, nil, containerName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Start the new container
+	if err := apiClient.ContainerStart(context.Background(), resp.ID, container.StartOptions{}); err != nil {
+		return nil, err
+	}
+
 	return &RunningSystem{
 		ReplicaIndex: r.index,
 
-		// TODO: Ports
+		Ports: ports,
 
 		parentReplica: r,
+
+		containerName: containerName,
 
 		commit:           commitHash,
 		commitRootOffset: nextCommit,
@@ -171,6 +258,8 @@ type RunningSystem struct {
 
 	parentReplica *replica
 
+	containerName string // The name of the container running this system
+
 	commit           string // The current commit
 	commitRootOffset int    // The offset of the current commit to the root commit
 }
@@ -181,6 +270,21 @@ func (r RunningSystem) IsGood() {
 
 func (r RunningSystem) IsBad() {
 	r.parentReplica.isBad(r)
+}
+
+func (r RunningSystem) stop() {
+	// Create docker client
+	apiClient, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		// TODO: Probably just logging should be enough?
+		panic(err)
+	}
+	defer apiClient.Close()
+
+	if err := apiClient.ContainerStop(context.Background(), r.containerName, container.StopOptions{}); err != nil {
+		// TODO: Probably just logging should be enough?
+		panic(err)
+	}
 }
 
 // An OffendingCommit represents the finished bisection of a replica.
