@@ -44,6 +44,9 @@ func GetJobFromConfig(r io.Reader) (*Job, error) {
 	job := Job{
 		BuildCost: config.BuildCost,
 
+		GoodCommit: config.GoodCommit,
+		BadCommit:  config.BadCommit,
+
 		Dockerfile:             config.Dockerfile,
 		DockerfilePath:         config.DockerfilePath,
 		DockerfilePathRelative: config.DockerfilePathRelative,
