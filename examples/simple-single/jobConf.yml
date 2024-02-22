@@ -1,0 +1,25 @@
+# TODO: Add explanations for every key
+repository: "git@github.com:DominicWuest/biscepter-test-repo.git"
+goodCommit: "ed76c4c1c375d60cc921a819433793126fc6facf"
+badCommit: "3098191c0b916d209ed371204a07014e0ceb3396"
+# errorExitCode: 1
+port: 3333
+# ports:
+# - 80
+# - 443
+# healthcheck:
+# - port: 1337
+#   type: http
+# - port: 8080
+#   type: |
+#     script:
+#     echo "Here"
+#     exit 0
+dockerfile: |
+  FROM go:1.22.0-alpine
+  WORKDIR /app
+  COPY . .
+  CMD go run main.go
+# dockerfilePath: example/neo4j.Dockerfile
+# dockerfilePathRelative: build/Dockerfile
+buildCost: 100
