@@ -15,6 +15,7 @@ import (
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/go-connections/nat"
 	"github.com/moby/moby/daemon/graphdriver/copy"
+	"github.com/phayes/freeport"
 )
 
 // A replica is a single instance of a job and is used to bisect one issue
@@ -152,6 +153,9 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 	}
 	defer apiClient.Close()
 
+	// TODO: CAS on map, whether commit is being built currently. Wait for build to complete if yes
+	// TODO: Check if image built already - init map of all built commits in job
+
 	// Build the new image
 	imageName := "biscepter-" + commitHash
 	// TODO: Have to ensure there is no dockerfile being overwritten in dest repo
@@ -174,30 +178,42 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 
 	// Setup the ports
 	ports := make(map[int]int)
+	exposedPorts := make(nat.PortSet)
+	portBindings := make(nat.PortMap)
+
+	// Add all needed ports to the ports map
+	for _, healthcheck := range r.parentJob.Healthchecks {
+		ports[healthcheck.Port] = 0
+	}
+	for _, port := range r.parentJob.Ports {
+		ports[port] = 0
+	}
+
+	// Assign free ports
+	for port := range ports {
+		natPort := nat.Port(fmt.Sprint(port))
+
+		freePort, err := freeport.GetFreePort()
+		if err != nil {
+			return nil, err
+		}
+
+		exposedPorts[natPort] = struct{}{}
+		portBindings[natPort] = []nat.PortBinding{{HostPort: fmt.Sprint(freePort)}}
+		ports[port] = freePort
+	}
 
 	// Setup the container config
 	containerConfig := &container.Config{
-		Image: imageName,
-		ExposedPorts: nat.PortSet{
-			// TODO: Don't hardcode lol
-			"3333": struct{}{},
-		},
+		Image:        imageName,
+		ExposedPorts: exposedPorts,
 	}
 
 	// Setup the host config
 	hostConfig := &container.HostConfig{
-		AutoRemove: true,
-		PortBindings: nat.PortMap{
-			"3333": []nat.PortBinding{
-				{
-					// TODO: Choose the host port here
-					HostPort: "3333",
-				},
-			},
-		},
+		AutoRemove:   true,
+		PortBindings: portBindings,
 	}
-
-	ports[3333] = 3333
 
 	containerName := fmt.Sprintf("biscepter-%d-%d", r.index, r.ranContainers)
 	r.ranContainers++
@@ -212,6 +228,8 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 	if err := apiClient.ContainerStart(context.Background(), resp.ID, container.StartOptions{}); err != nil {
 		return nil, err
 	}
+
+	// TODO: Perform healthchecks
 
 	return &RunningSystem{
 		ReplicaIndex: r.index,

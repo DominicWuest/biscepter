@@ -116,6 +116,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 		return nil, nil, err
 	}
 
+	// TODO: Make sure there is a path from BadCommit to GoodCommit
 	// Get all commits
 	cmd := exec.Command("git", "rev-list", "--reverse", "--first-parent", "^"+job.GoodCommit, job.BadCommit)
 	cmd.Dir = job.repoPath
