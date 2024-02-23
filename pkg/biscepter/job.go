@@ -1,6 +1,7 @@
 package biscepter
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"github.com/creasty/defaults"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 	"gopkg.in/yaml.v3"
 )
 
@@ -118,6 +121,8 @@ type Job struct {
 	repoPath   string // The path to the original cloned repository which replicas will copy from
 
 	commits []string // This job's commits, where commits[0] is the bad commit and commits[N-1] is the good commit
+
+	builtImages map[string]struct{} // A hashmap where, if a commit exists as a key, this commit's docker image has already been built before
 }
 
 // Run the job. This initializes all the replicas and starts them. This function returns a [RunningSystem] channel and an [OffendingCommit] channel.
@@ -159,7 +164,22 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	}
 	job.commits = strings.Split(string(out), "\n")
 
-	fmt.Printf("Commits: %s\n", job.commits)
+	// Get all built images
+	job.builtImages = make(map[string]struct{})
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, nil, err
+	}
+	images, err := cli.ImageList(context.Background(), types.ImageListOptions{})
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, image := range images {
+		if len(image.RepoTags) == 1 {
+			job.builtImages[strings.TrimSuffix(image.RepoTags[0], ":latest")] = struct{}{}
+		}
+	}
+	cli.Close()
 
 	// Make the channels
 	// TODO: Don't hardcode channel size

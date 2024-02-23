@@ -155,24 +155,26 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 	// TODO: CAS on map, whether commit is being built currently. Wait for build to complete if yes
 	// TODO: Check if image built already - init map of all built commits in job
 
-	// Build the new image
+	// Build the new image if it doesn't exist yet
 	imageName := "biscepter-" + commitHash
-	// TODO: Have to ensure there is no dockerfile being overwritten in dest repo
-	os.WriteFile(path.Join(r.repoPath, "Dockerfile"), []byte(r.parentJob.dockerfileString), 0777)
-	ctx, err := archive.TarWithOptions(r.repoPath, &archive.TarOptions{})
-	if err != nil {
-		return nil, err
-	}
-	buildRes, err := apiClient.ImageBuild(context.Background(), ctx, types.ImageBuildOptions{
-		Tags: []string{imageName},
-	})
-	if err != nil {
-		return nil, err
-	}
-	// Wait for build to be done
-	_, err = io.ReadAll(buildRes.Body)
-	if err != nil {
-		return nil, err
+	if _, ok := r.parentJob.builtImages[imageName]; !ok {
+		// TODO: Have to ensure there is no dockerfile being overwritten in dest repo
+		os.WriteFile(path.Join(r.repoPath, "Dockerfile"), []byte(r.parentJob.dockerfileString), 0777)
+		ctx, err := archive.TarWithOptions(r.repoPath, &archive.TarOptions{})
+		if err != nil {
+			return nil, err
+		}
+		buildRes, err := apiClient.ImageBuild(context.Background(), ctx, types.ImageBuildOptions{
+			Tags: []string{imageName},
+		})
+		if err != nil {
+			return nil, err
+		}
+		// Wait for build to be done
+		_, err = io.ReadAll(buildRes.Body)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Setup the ports
