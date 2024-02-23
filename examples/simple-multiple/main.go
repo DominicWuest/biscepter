@@ -40,6 +40,10 @@ func main() {
 			offendingCommits++
 			if offendingCommits == 3 {
 				fmt.Println("Finished bisecting all issues!")
+
+				if err := job.Stop(); err != nil {
+					panic(err)
+				}
 				return
 			}
 		// New system to test online

@@ -36,6 +36,10 @@ func main() {
 		// Offending commit found
 		case commit := <-ocChan:
 			fmt.Printf("Bisection done! Offending commit: %s\n", commit.Commit)
+
+			if err := job.Stop(); err != nil {
+				panic(err)
+			}
 			return
 		// New system to test online
 		case system := <-rsChan:
