@@ -178,7 +178,8 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 			return nil, err
 		}
 		buildRes, err := apiClient.ImageBuild(context.Background(), ctx, types.ImageBuildOptions{
-			Tags: []string{imageName},
+			Tags:        []string{imageName},
+			ForceRemove: true,
 		})
 		if err != nil {
 			return nil, err
