@@ -25,9 +25,8 @@ type jobYaml struct {
 
 	Healthcheck []healthcheckYaml `yaml:"healthcheck"`
 
-	Dockerfile             string `yaml:"dockerfile"`
-	DockerfilePath         string `yaml:"dockerfilePath"`
-	DockerfilePathRelative string `yaml:"dockerfilePathRelative"`
+	Dockerfile     string `yaml:"dockerfile"`
+	DockerfilePath string `yaml:"dockerfilePath"`
 
 	BuildCost float64 `yaml:"buildCost"`
 }
@@ -49,9 +48,8 @@ func GetJobFromConfig(r io.Reader) (*Job, error) {
 		GoodCommit: config.GoodCommit,
 		BadCommit:  config.BadCommit,
 
-		Dockerfile:             config.Dockerfile,
-		DockerfilePath:         config.DockerfilePath,
-		DockerfilePathRelative: config.DockerfilePathRelative,
+		Dockerfile:     config.Dockerfile,
+		DockerfilePath: config.DockerfilePath,
 
 		repository: config.Repository,
 	}
@@ -109,9 +107,8 @@ type Job struct {
 	GoodCommit string
 	BadCommit  string
 
-	Dockerfile             string // The contents of the dockerfile.
-	DockerfilePath         string // The path to the dockerfile relative to the present working directory. Only gets used if Dockerfile is empty.
-	DockerfilePathRelative string // The path to the dockerfile relative to the project's root. Only gets used if Dockerfile and DockerfilePath are empty.
+	Dockerfile     string // The contents of the dockerfile.
+	DockerfilePath string // The path to the dockerfile relative to the present working directory. Only gets used if Dockerfile is empty.
 
 	dockerfileString string
 
@@ -142,11 +139,21 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 		return nil, nil, err
 	}
 
-	// TODO: Make sure there is a path from BadCommit to GoodCommit
-	// Get all commits
-	cmd := exec.Command("git", "rev-list", "--reverse", "--first-parent", "^"+job.GoodCommit, job.BadCommit)
+	// Make sure there is a path from BadCommit to GoodCommit
+	cmd := exec.Command("git", "rev-list", "--reverse", "--first-parent", job.BadCommit)
 	cmd.Dir = job.repoPath
 	out, err := cmd.Output()
+	if err != nil {
+		return nil, nil, err
+	}
+	if !strings.Contains(string(out), job.GoodCommit) {
+		return nil, nil, fmt.Errorf("good commit %s cannot be reached from bad commit %s", job.GoodCommit, job.BadCommit)
+	}
+
+	// Get all commits
+	cmd = exec.Command("git", "rev-list", "--reverse", "--first-parent", "^"+job.GoodCommit, job.BadCommit)
+	cmd.Dir = job.repoPath
+	out, err = cmd.Output()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -201,11 +208,16 @@ func (j *Job) Stop() error {
 	return os.RemoveAll(j.repoPath)
 }
 
+// convertDockerfile sets j.dockerfileString based on the fields set.
+// It prioritizes Dockerfile but uses DockerfilePath if it is empty
 func (j *Job) convertDockerfile() error {
-	// Convert the dockerfile
 	j.dockerfileString = j.Dockerfile
 	if j.dockerfileString == "" {
-		// TODO: Read job.DockerfilePath
+		file, err := os.ReadFile(j.DockerfilePath)
+		if err != nil {
+			return err
+		}
+		j.dockerfileString = string(file)
 	}
 	return nil
 }

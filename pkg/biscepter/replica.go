@@ -9,6 +9,7 @@ import (
 	"path"
 	"sync"
 
+	"github.com/dchest/uniuri"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
@@ -30,8 +31,6 @@ type replica struct {
 	badCommitOffset  int // The offset to the original bad commit of the oldest bad commit
 
 	waitingCond *sync.Cond // Condition variable used by goroutine created in replica.start to wait until the current commit was reported to be good or bad
-
-	ranContainers int // How many containers this replica ran. Used for naming containers
 
 	isStopped bool // Whether this replica is running
 }
@@ -215,8 +214,7 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 		PortBindings: portBindings,
 	}
 
-	containerName := fmt.Sprintf("biscepter-%d-%d", r.index, r.ranContainers)
-	r.ranContainers++
+	containerName := "biscepter-" + uniuri.New()
 
 	// Create the new container
 	resp, err := apiClient.ContainerCreate(context.Background(), containerConfig, hostConfig, nil, nil, containerName)
