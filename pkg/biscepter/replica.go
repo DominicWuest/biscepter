@@ -103,7 +103,7 @@ func (r *replica) isGood(rs RunningSystem) {
 	}
 	r.goodCommitOffset = rs.commitRootOffset + 1
 
-	rs.stop()
+	go rs.stop()
 
 	// Signal goroutine started in start() to wake up again
 	r.waitingCond.L.Lock()
@@ -118,7 +118,7 @@ func (r *replica) isBad(rs RunningSystem) {
 	}
 	r.badCommitOffset = rs.commitRootOffset
 
-	rs.stop()
+	go rs.stop()
 
 	// Signal goroutine started in start() to wake up again
 	r.waitingCond.L.Lock()
