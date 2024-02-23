@@ -33,6 +33,8 @@ type replica struct {
 	waitingCond *sync.Cond // Condition variable used by goroutine created in replica.start to wait until the current commit was reported to be good or bad
 
 	isStopped bool // Whether this replica is running
+
+	lastRunningSystem *RunningSystem // The last running system created by this replica. Is shut down when the replica is stopped
 }
 
 func createJobReplica(j *Job, index int) (*replica, error) {
@@ -91,6 +93,10 @@ func (r *replica) stop() error {
 	r.isStopped = true
 	r.waitingCond.Signal()
 
+	if r.lastRunningSystem != nil {
+		r.lastRunningSystem.stop()
+	}
+
 	// Clean up tmp directory of repo
 	return os.RemoveAll(r.repoPath)
 }
@@ -102,7 +108,11 @@ func (r *replica) isGood(rs RunningSystem) {
 	}
 	r.goodCommitOffset = rs.commitRootOffset + 1
 
-	go rs.stop()
+	go func() {
+		if err := rs.stop(); err != nil {
+			panic(err)
+		}
+	}()
 
 	// Signal goroutine started in start() to wake up again
 	r.waitingCond.L.Lock()
@@ -117,7 +127,11 @@ func (r *replica) isBad(rs RunningSystem) {
 	}
 	r.badCommitOffset = rs.commitRootOffset
 
-	go rs.stop()
+	go func() {
+		if err := rs.stop(); err != nil {
+			panic(err)
+		}
+	}()
 
 	// Signal goroutine started in start() to wake up again
 	r.waitingCond.L.Lock()
@@ -243,7 +257,7 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 		}
 	}
 
-	return &RunningSystem{
+	rs := &RunningSystem{
 		ReplicaIndex: r.index,
 
 		Ports: ports,
@@ -254,7 +268,11 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 
 		commit:           commitHash,
 		commitRootOffset: nextCommit,
-	}, nil
+	}
+
+	r.lastRunningSystem = rs
+
+	return rs, nil
 }
 
 // getNextCommit returns the next commit which should be used for bisection
@@ -302,19 +320,19 @@ func (r RunningSystem) IsBad() {
 	r.parentReplica.isBad(r)
 }
 
-func (r RunningSystem) stop() {
+func (r RunningSystem) stop() error {
 	// Create docker client
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		// TODO: Probably just logging should be enough?
-		panic(err)
+		return err
 	}
 	defer apiClient.Close()
 
 	if err := apiClient.ContainerStop(context.Background(), r.containerName, container.StopOptions{}); err != nil {
 		// TODO: Probably just logging should be enough?
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 // An OffendingCommit represents the finished bisection of a replica.
