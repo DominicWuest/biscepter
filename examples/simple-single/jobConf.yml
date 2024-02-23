@@ -16,7 +16,7 @@ port: 3333
 #     echo "Here"
 #     exit 0
 dockerfile: |
-  FROM go:1.22.0-alpine
+  FROM golang:1.22.0-alpine
   WORKDIR /app
   COPY . .
   CMD go run main.go
