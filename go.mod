@@ -3,6 +3,7 @@ module github.com/DominicWuest/biscepter
 go 1.22.0
 
 require (
+	github.com/creasty/defaults v1.7.0
 	github.com/docker/docker v25.0.3+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/moby/moby v25.0.3+incompatible

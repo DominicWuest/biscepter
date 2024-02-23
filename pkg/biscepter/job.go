@@ -6,11 +6,13 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
+	"github.com/creasty/defaults"
 	"gopkg.in/yaml.v3"
 )
 
-type jobConfig struct {
+type jobYaml struct {
 	Repository string `yaml:"repository"`
 
 	GoodCommit string `yaml:"goodCommit"`
@@ -21,7 +23,7 @@ type jobConfig struct {
 	Port  int   `yaml:"port"`
 	Ports []int `yaml:"ports"`
 
-	Healthcheck []healthcheckConf `yaml:"healthcheck"`
+	Healthcheck []healthcheckYaml `yaml:"healthcheck"`
 
 	Dockerfile             string `yaml:"dockerfile"`
 	DockerfilePath         string `yaml:"dockerfilePath"`
@@ -32,7 +34,7 @@ type jobConfig struct {
 
 // GetJobFromConfig reads in a job config in yaml format from a reader and initializes the corresponding job struct
 func GetJobFromConfig(r io.Reader) (*Job, error) {
-	var config jobConfig
+	var config jobYaml
 
 	// Read in yaml
 	decoder := yaml.NewDecoder(r)
@@ -59,10 +61,34 @@ func GetJobFromConfig(r io.Reader) (*Job, error) {
 		job.Ports = []int{config.Port}
 	}
 
+	// Set all the healthchecks
+	checkTypes := map[string]HealthcheckType{
+		"http":   HttpGet200,
+		"script": Script,
+	}
 	for _, check := range config.Healthcheck {
+		if err := defaults.Set(&check); err != nil {
+			return nil, err
+		}
+		checkType, ok := checkTypes[strings.ToLower(check.Type)]
+		if !ok {
+			return nil, fmt.Errorf("invalid check type supplied for healthcheck %s", check.Type)
+		}
+
 		// TODO: Implement fully
 		job.Healthchecks = append(job.Healthchecks, Healthcheck{
-			Port: check.Port,
+			Port:      check.Port,
+			CheckType: checkType,
+
+			Metadata: check.Metadata,
+			Config: HealthcheckConfig{
+				Retries: check.Retries,
+
+				Backoff: check.Backoff * time.Millisecond,
+
+				BackoffIncrement: check.BackoffIncrement * time.Millisecond,
+				MaxBackoff:       check.MaxBackoff * time.Millisecond,
+			},
 		})
 	}
 

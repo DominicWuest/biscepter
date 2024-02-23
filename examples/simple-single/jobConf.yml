@@ -7,14 +7,13 @@ port: 3333
 # ports:
 # - 80
 # - 443
-# healthcheck:
-# - port: 1337
-#   type: http
+healthcheck:
+- port: 3333
+  type: http
+  metadata: "/1"
 # - port: 8080
-#   type: |
-#     script:
-#     echo "Here"
-#     exit 0
+#   type: script
+#   metadata: echo "Here"
 dockerfile: |
   FROM golang:1.22.0-alpine
   WORKDIR /app

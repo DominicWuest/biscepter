@@ -229,7 +229,15 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 		return nil, err
 	}
 
-	// TODO: Perform healthchecks
+	// Perform healthchecks
+	for _, healthcheck := range r.parentJob.Healthchecks {
+		success, err := healthcheck.performHealthcheck(ports)
+		if !success {
+			return nil, fmt.Errorf("healthcheck on port %d failed", healthcheck.Port)
+		} else if err != nil {
+			return nil, err
+		}
+	}
 
 	return &RunningSystem{
 		ReplicaIndex: r.index,
