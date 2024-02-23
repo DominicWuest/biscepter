@@ -152,12 +152,11 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 	}
 	defer apiClient.Close()
 
-	// TODO: CAS on map, whether commit is being built currently. Wait for build to complete if yes
-	// TODO: Check if image built already - init map of all built commits in job
-
 	// Build the new image if it doesn't exist yet
 	imageName := "biscepter-" + commitHash
-	if _, ok := r.parentJob.builtImages[imageName]; !ok {
+	r.parentJob.imagesBuilding[commitHash].Lock()
+	if !r.parentJob.builtImages[imageName] {
+		// Image has not been built yet
 		// TODO: Have to ensure there is no dockerfile being overwritten in dest repo
 		os.WriteFile(path.Join(r.repoPath, "Dockerfile"), []byte(r.parentJob.dockerfileString), 0777)
 		ctx, err := archive.TarWithOptions(r.repoPath, &archive.TarOptions{})
@@ -175,6 +174,11 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 		if err != nil {
 			return nil, err
 		}
+		r.parentJob.builtImages[imageName] = true
+		r.parentJob.imagesBuilding[commitHash].Unlock()
+	} else {
+		// Image has been built - reuse it
+		r.parentJob.imagesBuilding[commitHash].Unlock()
 	}
 
 	// Setup the ports

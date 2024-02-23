@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/creasty/defaults"
@@ -122,7 +123,9 @@ type Job struct {
 
 	commits []string // This job's commits, where commits[0] is the bad commit and commits[N-1] is the good commit
 
-	builtImages map[string]struct{} // A hashmap where, if a commit exists as a key, this commit's docker image has already been built before
+	builtImages map[string]bool // A hashmap where, if a commit exists as a key, this commit's docker image has already been built before
+
+	imagesBuilding map[string]*sync.Mutex // Map of keys for every commit to ensure only one replica is building a specific commit at once
 }
 
 // Run the job. This initializes all the replicas and starts them. This function returns a [RunningSystem] channel and an [OffendingCommit] channel.
@@ -164,8 +167,14 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	}
 	job.commits = strings.Split(string(out), "\n")
 
+	// Initialize the building locks
+	job.imagesBuilding = make(map[string]*sync.Mutex)
+	for _, commit := range job.commits {
+		job.imagesBuilding[commit] = &sync.Mutex{}
+	}
+
 	// Get all built images
-	job.builtImages = make(map[string]struct{})
+	job.builtImages = make(map[string]bool)
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, nil, err
@@ -176,7 +185,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	}
 	for _, image := range images {
 		if len(image.RepoTags) == 1 {
-			job.builtImages[strings.TrimSuffix(image.RepoTags[0], ":latest")] = struct{}{}
+			job.builtImages[strings.TrimSuffix(image.RepoTags[0], ":latest")] = true
 		}
 	}
 	cli.Close()
