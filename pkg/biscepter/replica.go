@@ -17,6 +17,7 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/moby/moby/daemon/graphdriver/copy"
 	"github.com/phayes/freeport"
+	"github.com/sirupsen/logrus"
 )
 
 // A replica is a single instance of a job and is used to bisect one issue
@@ -35,6 +36,8 @@ type replica struct {
 	isStopped bool // Whether this replica is running
 
 	lastRunningSystem *RunningSystem // The last running system created by this replica. Is shut down when the replica is stopped
+
+	log *logrus.Entry
 }
 
 func createJobReplica(j *Job, index int) (*replica, error) {
@@ -58,6 +61,8 @@ func createJobReplica(j *Job, index int) (*replica, error) {
 		badCommitOffset:  len(j.commits) - 1,
 
 		waitingCond: sync.NewCond(&sync.Mutex{}),
+
+		log: j.Log.WithField("replica-index", index),
 	}, nil
 }
 
@@ -75,7 +80,7 @@ func (r *replica) start(rsChan chan RunningSystem, ocChan chan OffendingCommit) 
 			readySystem, err := r.initNextSystem()
 			if err != nil {
 				// TODO: What to do here?
-				panic(err)
+				r.log.Panicf("Replica %d failed to init next system - %v", r.index, err)
 			}
 			rsChan <- *readySystem
 
@@ -110,7 +115,7 @@ func (r *replica) isGood(rs RunningSystem) {
 
 	go func() {
 		if err := rs.stop(); err != nil {
-			panic(err)
+			r.log.Warnf("Failed to stop container %s - %v", rs.containerName, err)
 		}
 	}()
 
@@ -129,7 +134,7 @@ func (r *replica) isBad(rs RunningSystem) {
 
 	go func() {
 		if err := rs.stop(); err != nil {
-			panic(err)
+			r.log.Warnf("Failed to stop container %s - %v", rs.containerName, err)
 		}
 	}()
 
@@ -142,8 +147,6 @@ func (r *replica) isBad(rs RunningSystem) {
 func (r *replica) initNextSystem() (*RunningSystem, error) {
 	nextCommit := r.getNextCommit()
 	commitHash := r.parentJob.commits[nextCommit]
-
-	fmt.Println("Testing ", commitHash)
 
 	// Checkout new commit
 	cmd := exec.Command("git", "checkout", commitHash)
@@ -170,6 +173,7 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 	imageName := "biscepter-" + commitHash
 	r.parentJob.imagesBuilding[commitHash].Lock()
 	if !r.parentJob.builtImages[imageName] {
+		r.log.Infof("Building image %s of commit %s", imageName, commitHash)
 		// Image has not been built yet
 		// TODO: Have to ensure there is no dockerfile being overwritten in dest repo
 		os.WriteFile(path.Join(r.repoPath, "Dockerfile"), []byte(r.parentJob.dockerfileString), 0777)
@@ -193,6 +197,7 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 		r.parentJob.imagesBuilding[commitHash].Unlock()
 	} else {
 		// Image has been built - reuse it
+		r.log.Infof("Image %s of commit %s already built, reusing image", imageName, commitHash)
 		r.parentJob.imagesBuilding[commitHash].Unlock()
 	}
 
@@ -237,6 +242,8 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 
 	containerName := "biscepter-" + uniuri.New()
 
+	r.log.Debugf("Exposed ports: %+v, Port bindings: %+v", exposedPorts, portBindings)
+
 	// Create the new container
 	resp, err := apiClient.ContainerCreate(context.Background(), containerConfig, hostConfig, nil, nil, containerName)
 	if err != nil {
@@ -248,15 +255,19 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 		return nil, err
 	}
 
+	r.log.Infof("Started container %s running commit %s, performing healthchecks...", containerName, commitHash)
+
 	// Perform healthchecks
 	for _, healthcheck := range r.parentJob.Healthchecks {
-		success, err := healthcheck.performHealthcheck(ports)
+		success, err := healthcheck.performHealthcheck(ports, r.log)
 		if !success {
 			return nil, fmt.Errorf("healthcheck on port %d failed", healthcheck.Port)
 		} else if err != nil {
 			return nil, err
 		}
 	}
+
+	r.log.Infof("Successfully performed healthchecks on container %s running commit %s", containerName, commitHash)
 
 	rs := &RunningSystem{
 		ReplicaIndex: r.index,
@@ -278,7 +289,9 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 
 // getNextCommit returns the next commit which should be used for bisection
 func (r replica) getNextCommit() int {
-	return (r.goodCommitOffset + r.badCommitOffset) / 2
+	nextCommit := (r.goodCommitOffset + r.badCommitOffset) / 2
+	r.log.Debugf("Good commit %d, Bad commit %d, next commit %d", r.goodCommitOffset, r.badCommitOffset, nextCommit)
+	return nextCommit
 }
 
 // getOffendingCommit returns the offending commit for the issue bisected by the replica if it was found.
@@ -290,6 +303,8 @@ func (r *replica) getOffendingCommit() *OffendingCommit {
 	}
 
 	// TODO: Check if commit is a merge commit, bisect merge branch if yes
+
+	r.log.Infof("Found offending commit %s with offset %d", r.parentJob.commits[r.goodCommitOffset], r.goodCommitOffset)
 
 	return &OffendingCommit{
 		ReplicaIndex: r.index,
@@ -330,7 +345,6 @@ func (r RunningSystem) stop() error {
 	defer apiClient.Close()
 
 	if err := apiClient.ContainerStop(context.Background(), r.containerName, container.StopOptions{}); err != nil {
-		// TODO: Probably just logging should be enough?
 		return err
 	}
 	return nil

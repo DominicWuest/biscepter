@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 type healthcheckYaml struct {
@@ -51,7 +53,7 @@ type Healthcheck struct {
 // performHealthcheck performs the given healthcheck of the passed port mappings.
 // If the healthcheck is unsuccessful, the returned boolean is false and the error may not be nil.
 // If the returned boolean is true, the returned error is nil
-func (h Healthcheck) performHealthcheck(portsMapping map[int]int) (bool, error) {
+func (h Healthcheck) performHealthcheck(portsMapping map[int]int, log *logrus.Entry) (bool, error) {
 	var lastSuccess bool
 	var lastError error
 
@@ -61,12 +63,19 @@ func (h Healthcheck) performHealthcheck(portsMapping map[int]int) (bool, error) 
 
 		// Manage backoff
 		if (i != h.Config.Retries-1) && !lastSuccess {
+			// TODO: Use logrus.Entry instead of default logger
+			log.Debugf("Healthcheck %d/%d failed. Error: %v. Waiting for %s", i+1, h.Config.Retries, lastError, backoffDuration.String())
 			time.Sleep(backoffDuration)
 			backoffDuration += h.Config.BackoffIncrement
 			if backoffDuration > h.Config.MaxBackoff {
 				backoffDuration = h.Config.MaxBackoff
 			}
 		}
+	}
+
+	if !lastSuccess {
+		// TODO: Use logrus.Entry instead of default logger
+		log.Warnf("Healthcheck %d/%d of type %d failed on port %d which was mapped to %d.", h.Config.Retries, h.Config.Retries, h.CheckType, h.Port, portsMapping[h.Port])
 	}
 
 	return lastSuccess, lastError

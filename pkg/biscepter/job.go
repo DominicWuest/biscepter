@@ -13,6 +13,7 @@ import (
 	"github.com/creasty/defaults"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
@@ -114,6 +115,8 @@ type Job struct {
 	Dockerfile     string // The contents of the dockerfile.
 	DockerfilePath string // The path to the dockerfile relative to the present working directory. Only gets used if Dockerfile is empty.
 
+	Log *logrus.Logger // The log to which information gets printed to
+
 	dockerfileString string
 
 	replicas []*replica // This job's replicas
@@ -132,6 +135,13 @@ type Job struct {
 // The [RunningSystem] channel should be used to get notified about systems which are ready to be tested.
 // Once an [OffendingCommit] was received for a given replica index, no more [RunningSystem] structs for this replica will appear in the [RunningSystem] channel.
 func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
+	// Init the logger
+	if job.Log == nil {
+		job.Log = logrus.New()
+	}
+	// TODO: Remove this later
+	job.Log.SetLevel(logrus.TraceLevel)
+
 	// Populate job.dockerfileBytes, depending on which values were present in the config
 	if err := job.convertDockerfile(); err != nil {
 		return nil, nil, err
