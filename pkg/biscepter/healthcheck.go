@@ -70,6 +70,10 @@ func (h Healthcheck) performHealthcheck(portsMapping map[int]int, log *logrus.En
 			if backoffDuration > h.Config.MaxBackoff {
 				backoffDuration = h.Config.MaxBackoff
 			}
+		} else {
+			// Healthcheck successful
+			log.Debugf("Healthcheck successful after %d tries", i+1)
+			break
 		}
 	}
 
