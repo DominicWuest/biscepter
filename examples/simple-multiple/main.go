@@ -30,13 +30,21 @@ func main() {
 		panic(err)
 	}
 
+	// This is just here to make the output prettier
+	var colors map[int]string = map[int]string{
+		0: "\u001B[0;35m",
+		1: "\u001B[0;32m",
+		2: "\u001B[0;36m",
+	}
+	colorReset := "\u001B[0m"
+
 	// Waiting for running systems or offending commit
 	offendingCommits := 0
 	for {
 		select {
 		// Offending commit found
 		case commit := <-ocChan:
-			fmt.Printf("%d: Bisection done for replica with index %d! Offending commit: %s\n", commit.ReplicaIndex, commit.ReplicaIndex, commit.Commit)
+			fmt.Printf("%s%d: Bisection done for replica with index %d! Offending commit: %s%s\n", colors[commit.ReplicaIndex], commit.ReplicaIndex, commit.ReplicaIndex, commit.Commit, colorReset)
 			offendingCommits++
 			if offendingCommits == 3 {
 				fmt.Println("Finished bisecting all issues!")
@@ -48,7 +56,7 @@ func main() {
 			}
 		// New system to test online
 		case system := <-rsChan:
-			fmt.Printf("%d: Got running system on port %d for replica with index %d\n", system.ReplicaIndex, system.Ports[3333], system.ReplicaIndex)
+			fmt.Printf("%s%d: Got running system on port %d for replica with index %d%s\n", colors[system.ReplicaIndex], system.ReplicaIndex, system.Ports[3333], system.ReplicaIndex, colorReset)
 
 			res, err := http.Get(fmt.Sprintf("http://localhost:%d/%d", system.Ports[3333], system.ReplicaIndex))
 			if err != nil {
@@ -61,13 +69,13 @@ func main() {
 			}
 			resText := string(resBytes)
 
-			fmt.Printf("%d: Got response %s\n", system.ReplicaIndex, resText)
+			fmt.Printf("%s%d: Got response %s%s\n", colors[system.ReplicaIndex], system.ReplicaIndex, resText, colorReset)
 
 			if resText == fmt.Sprint(system.ReplicaIndex) {
-				fmt.Printf("%d: This commit is good!\n", system.ReplicaIndex)
+				fmt.Printf("%s%d: This commit is good!%s\n", colors[system.ReplicaIndex], system.ReplicaIndex, colorReset)
 				system.IsGood()
 			} else {
-				fmt.Printf("%d: This commit is bad!\n", system.ReplicaIndex)
+				fmt.Printf("%s%d: This commit is bad!%s\n", colors[system.ReplicaIndex], system.ReplicaIndex, colorReset)
 				system.IsBad()
 			}
 		}
