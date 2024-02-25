@@ -137,9 +137,12 @@ type Job struct {
 func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	// Init the logger
 	if job.Log == nil {
+		// Mute logger
 		job.Log = logrus.New()
+		job.Log.SetOutput(io.Discard)
 	}
 	// TODO: Remove this later
+	job.Log = logrus.New()
 	job.Log.SetLevel(logrus.TraceLevel)
 
 	// Populate job.dockerfileBytes, depending on which values were present in the config
