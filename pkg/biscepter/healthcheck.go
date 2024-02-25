@@ -14,11 +14,11 @@ type healthcheckYaml struct {
 
 	Metadata string `yaml:"metadata"`
 
-	Retries int `yaml:"retries" default:"10"`
+	Retries int `yaml:"retries" default:"25"`
 
 	Backoff          time.Duration `yaml:"backoff" default:"1000"`
-	BackoffIncrement time.Duration `yaml:"backoffIncrement" default:"100"`
-	MaxBackoff       time.Duration `yaml:"maxBackoff" default:"2000"`
+	BackoffIncrement time.Duration `yaml:"backoffIncrement" default:"250"`
+	MaxBackoff       time.Duration `yaml:"maxBackoff" default:"3000"`
 }
 
 // HealthcheckConfig provides configurations for healthchecks being performed, such as the amount of retries or backoff duration
