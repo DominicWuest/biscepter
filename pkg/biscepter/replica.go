@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strings"
 	"sync"
 
 	"github.com/dchest/uniuri"
@@ -304,13 +305,40 @@ func (r *replica) getOffendingCommit() *OffendingCommit {
 
 	// TODO: Check if commit is a merge commit, bisect merge branch if yes
 
-	r.log.Infof("Found offending commit %s with offset %d", r.parentJob.commits[r.goodCommitOffset], r.goodCommitOffset)
+	// Get additional info about the commit
+	var commitMsg, commitDate, commitAuthor string
+	cmd := exec.Command("git", "--no-pager", "show", "-s", "--format=%B%aD%n%an <%ae>", r.parentJob.commits[r.goodCommitOffset])
+	cmd.Dir = r.repoPath
+	outBytes, err := cmd.Output()
+	if err != nil {
+		r.log.Errorf("Couldn't get additional offending commit info - %v", err)
+	} else {
+		out := string(outBytes)
+		if len(out) == 0 || strings.Count(out, "\n") != 3 {
+			r.log.Warnf("Git show output is not of the expected format: %q", out)
+		} else {
+			// Trim trailing newline
+			out = out[:len(out)-1]
+			authorOffset := strings.LastIndex(out, "\n")
+			dateOffset := strings.LastIndex(out[:authorOffset], "\n")
+
+			commitMsg = out[:dateOffset]
+			commitDate = out[dateOffset+1 : authorOffset]
+			commitAuthor = out[authorOffset+1:]
+		}
+	}
+
+	r.log.Infof("Found offending commit %s with offset %d. Message: %q, Date: %q, Author: %q", r.parentJob.commits[r.goodCommitOffset], r.goodCommitOffset, commitMsg, commitDate, commitAuthor)
 
 	return &OffendingCommit{
 		ReplicaIndex: r.index,
 
 		Commit:       r.parentJob.commits[r.goodCommitOffset],
 		CommitOffset: r.goodCommitOffset,
+
+		CommitMessage: commitMsg,
+		CommitDate:    commitDate,
+		CommitAuthor:  commitAuthor,
 	}
 }
 
@@ -356,4 +384,8 @@ type OffendingCommit struct {
 
 	Commit       string // The commit which introduced the issue. I.e. the oldest bad commit
 	CommitOffset int    // The offset to the initial commit of the commit which introduced the issue. I.e. the offset of the oldest bad commit
+
+	CommitMessage string // The message of the offending commit
+	CommitDate    string // The date of the offending commit
+	CommitAuthor  string // The author of the offending commit
 }
