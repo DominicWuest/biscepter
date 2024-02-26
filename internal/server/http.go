@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -16,7 +17,7 @@ type httpServer struct {
 	rsMap map[string]biscepter.RunningSystem
 }
 
-func (h *httpServer) Init(port int, rsChan chan biscepter.RunningSystem, ocChan chan biscepter.OffendingCommit) error {
+func (h *httpServer) init(port int, rsChan chan biscepter.RunningSystem, ocChan chan biscepter.OffendingCommit) error {
 	h.rsChan = rsChan
 	h.ocChan = ocChan
 
@@ -28,8 +29,7 @@ func (h *httpServer) Init(port int, rsChan chan biscepter.RunningSystem, ocChan 
 	router.POST("/isGood/:systemId", h.postIsGood)
 	router.POST("/isBad/:systemId", h.postIsBad)
 
-	go router.Run(fmt.Sprintf("localhost:%d", port))
-	return nil
+	return router.Run(fmt.Sprintf("localhost:%d", port))
 }
 
 type runningSystemResponse struct {
@@ -37,7 +37,7 @@ type runningSystemResponse struct {
 
 	ReplicaIndex int `json:"replicaIndex"`
 
-	Ports map[int]int `json:"ports"`
+	Ports map[string]string `json:"ports"`
 }
 
 type offendingCommitResponse struct {
@@ -65,14 +65,31 @@ func (h *httpServer) getSystem(c *gin.Context) {
 			CommitAuthor:  commit.CommitAuthor,
 		})
 	case system := <-h.rsChan:
+		// Register ID
 		id := uniuri.New()
 		h.rsMap[id] = system
+
+		// Convert ports to map of strings because JSON doesn't have int->int maps
+		strPorts := make(map[string]string)
+		for k, v := range system.Ports {
+			strPorts[fmt.Sprint(k)] = fmt.Sprint(v)
+		}
+
+		out, _ := json.Marshal(runningSystemResponse{
+			SystemIndex: id,
+
+			ReplicaIndex: system.ReplicaIndex,
+
+			Ports: strPorts,
+		})
+		fmt.Print(string(out))
+
 		c.JSON(http.StatusOK, runningSystemResponse{
 			SystemIndex: id,
 
 			ReplicaIndex: system.ReplicaIndex,
 
-			Ports: system.Ports,
+			Ports: strPorts,
 		})
 	}
 }
