@@ -1,0 +1,90 @@
+openapi: "3.1.0"
+info:
+  title: Biscepter API
+  description: Interact with a running biscepter process for bisecting issues.
+  version: 1.0.0
+
+paths:
+  /system:
+    get:
+      summary: Get the next running system or offending commit
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/RunningSystem"
+                  - $ref: "#/components/schemas/OffendingCommit"
+  /isGood/{systemId}:
+    post:
+      summary: Tell biscepter that this running system is good
+      parameters:
+        - in: path
+          name: systemId
+          required: true
+          schema:
+            type: string
+          description: The ID of the running system
+      responses:
+        200:
+          description: OK
+        404:
+          description: A running system with the given system ID was not found
+  /isBad/{systemId}:
+    post:
+      summary: Tell biscepter that this running system is bad
+      parameters:
+        - in: path
+          name: systemId
+          required: true
+          schema:
+            type: string
+          description: The ID of the running system
+      responses:
+        200:
+          description: OK
+        404:
+          description: A running system with the given system ID was not found
+
+components:
+  schemas:
+    RunningSystem:
+      type: object
+      description: A system that is ready to be tested
+      properties:
+        systemIndex:
+          description: The ID of this system. Used to tell biscepter whether this system is good or bad
+          type: string
+        replicaIndex:
+          description: The index of the replica which produced this system
+          type: integer
+        ports:
+          description: A mapping of the ports specified for the system under test to the ones they were mapped to locally
+          type: integer
+          additionalProperties:
+            type: integer
+
+    OffendingCommit:
+      type: object
+      description: A finished bisection of a replica
+      properties:
+        replicaIndex:
+          description: The index of the bisected replica
+          type: integer
+        commit:
+          description: The commit which introduced the issue. I.e. the oldest bad commit
+          type: string
+        commitOffset:
+          description: The offset to the initial good commit of the commit with introduced the issue. I.e. the offset of the oldest bad commit
+          type: integer
+        commitMessage:
+          description: The message of the offending commit
+          type: string
+        commitDate:
+          description: The date of the offending commit
+          type: string
+        commitAuthor:
+          description: The author of the offending commit
+          type: string
