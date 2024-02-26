@@ -9,7 +9,7 @@ paths:
     get:
       summary: Get the next running system or offending commit
       responses:
-        200:
+        "200":
           description: OK
           content:
             application/json:
@@ -28,9 +28,9 @@ paths:
             type: string
           description: The ID of the running system
       responses:
-        200:
+        "200":
           description: OK
-        404:
+        "404":
           description: A running system with the given system ID was not found
   /isBad/{systemId}:
     post:
@@ -43,9 +43,9 @@ paths:
             type: string
           description: The ID of the running system
       responses:
-        200:
+        "200":
           description: OK
-        404:
+        "404":
           description: A running system with the given system ID was not found
 
 components:
@@ -62,9 +62,13 @@ components:
           type: integer
         ports:
           description: A mapping of the ports specified for the system under test to the ones they were mapped to locally
-          type: integer
+          type: object
           additionalProperties:
-            type: integer
+            type: string
+      required:
+        - systemIndex
+        - replicaIndex
+        - ports
 
     OffendingCommit:
       type: object
@@ -88,3 +92,10 @@ components:
         commitAuthor:
           description: The author of the offending commit
           type: string
+      required:
+        - replicaIndex
+        - commit
+        - commitOffset
+        - commitMessage
+        - commitDate
+        - commitAuthor
