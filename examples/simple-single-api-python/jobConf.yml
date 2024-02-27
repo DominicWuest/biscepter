@@ -1,0 +1,14 @@
+repository: "git@github.com:DominicWuest/biscepter-test-repo.git"
+goodCommit: "ed76c4c1c375d60cc921a819433793126fc6facf"
+badCommit: "3098191c0b916d209ed371204a07014e0ceb3396"
+port: 3333
+healthcheck:
+- port: 3333
+  type: http
+  metadata: "/1"
+dockerfile: |
+  FROM golang:1.22.0-alpine
+  WORKDIR /app
+  COPY . .
+  CMD go run main.go
+buildCost: 100
