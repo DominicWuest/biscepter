@@ -35,7 +35,7 @@ func main() {
 		select {
 		// Offending commit found
 		case commit := <-ocChan:
-			fmt.Printf("Bisection done! Offending commit: %s\n", commit.Commit)
+			fmt.Printf("Bisection done! Offending commit: %s\nCommit message: %s\n", commit.Commit, commit.CommitMessage)
 
 			if err := job.Stop(); err != nil {
 				panic(err)

@@ -44,7 +44,7 @@ func main() {
 		select {
 		// Offending commit found
 		case commit := <-ocChan:
-			fmt.Printf("%s%d: Bisection done for replica with index %d! Offending commit: %s%s\n", colors[commit.ReplicaIndex], commit.ReplicaIndex, commit.ReplicaIndex, commit.Commit, colorReset)
+			fmt.Printf("%s%d: Bisection done for replica with index %d! Offending commit: %s\nCommit message: %s%s\n", colors[commit.ReplicaIndex], commit.ReplicaIndex, commit.ReplicaIndex, commit.Commit, commit.CommitMessage, colorReset)
 			offendingCommits++
 			if offendingCommits == 3 {
 				fmt.Println("Finished bisecting all issues!")
