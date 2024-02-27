@@ -32,6 +32,5 @@ with client as client:
                 post_is_good_system_id.sync_detailed(res.system_index, client=client)
             else:
                 # Response is not what we expected -> Commit is bad
-                print("This commit is good!")
                 print("This commit is bad!")
                 post_is_bad_system_id.sync_detailed(res.system_index, client=client)
