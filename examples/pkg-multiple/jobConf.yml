@@ -1,6 +1,6 @@
 repository: "git@github.com:DominicWuest/biscepter-test-repo.git"
-goodCommit: "ed76c4c1c375d60cc921a819433793126fc6facf"
-badCommit: "3098191c0b916d209ed371204a07014e0ceb3396"
+goodCommit: "8ee0e2a3c12e324c1b5c41f7861e341d91692efb"
+badCommit: "9b70eda4f3e48d5d906f99b570a16d5a979b0a99"
 port: 3333
 healthcheck:
 - port: 3333
