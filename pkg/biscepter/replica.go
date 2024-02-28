@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path"
@@ -291,8 +292,83 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 // getNextCommit returns the next commit which should be used for bisection
 func (r replica) getNextCommit() int {
 	nextCommit := (r.goodCommitOffset + r.badCommitOffset) / 2
-	r.log.Debugf("Good commit %d, Bad commit %d, next commit %d", r.goodCommitOffset, r.badCommitOffset, nextCommit)
-	return nextCommit
+
+	// Find closest cached build
+	offset := 0
+	for i := 0; i < r.badCommitOffset-nextCommit; i++ {
+		commitAbove := r.parentJob.commits[nextCommit+i]
+		commitBelow := r.parentJob.commits[nextCommit-i]
+
+		if r.parentJob.builtImages["biscepter-"+commitAbove] {
+			// If a commit above the middle is built
+			offset = i
+			break
+		} else if r.parentJob.builtImages["biscepter-"+commitBelow] && nextCommit-offset > r.goodCommitOffset {
+			// If a commit below the middle is built. Since nextCommit rounds down, we have to check we're not testing the same commit again
+			offset = -i
+			break
+		}
+	}
+
+	// Check, based on buildCost, whether this offset is worth it
+	/*
+		Definitions:
+		bC := build cost
+		c := % of cached builds between current good and bad commit
+		E[o] := expected number of runs if the offset is chosen (log_2(E[number of commits if offset is chosen]))
+		E[nO] := expected number of runs if the offset is not chosen (log_2(commits left to check))
+
+		oCost := Cost when using the offset
+		nOCost := Cost when not using the offset
+
+		oCost = E[o] * c + E[o] * (1 - c) * bC + 1 // +1 since we know the next commit would be cached
+		nOCost = E[nO] * c + E[o] * (1 - c) * bC + bC // +bC since we know the next commit has to be built
+
+		Use offset, if oCost < nOCost, else don't use the offset
+	*/
+	offsetCommit := nextCommit + offset
+	if offset != 0 {
+		commitsLeft := r.badCommitOffset - r.goodCommitOffset - 2
+		commitsAbove := r.badCommitOffset - offsetCommit - 1
+		commitsBelow := offsetCommit - r.goodCommitOffset - 1
+
+		// Assuming uniform distribution of buggy commits, calculate probabilities that commit is above/below
+		chanceAbove := float64(commitsAbove) / float64(commitsLeft)
+		chanceBelow := float64(commitsBelow) / float64(commitsLeft)
+
+		// Remaining commits estimate if we use this offset
+		expectedCommits := chanceAbove*float64(commitsAbove) + chanceBelow*float64(commitsBelow)
+
+		expectedRuns := math.Log2(expectedCommits)         // Expected runs with using cached build
+		expectedRunsOld := math.Log2(float64(commitsLeft)) // Expected runs without using cached build
+
+		// Get the fraction of cached vs uncached commits
+		cached := 0
+		for i := r.badCommitOffset + 1; i < r.goodCommitOffset-1; i++ {
+			if r.parentJob.builtImages["biscepter-"+r.parentJob.commits[i]] {
+				cached++
+			}
+		}
+
+		cachedFraction := float64(cached) / float64(commitsLeft)
+		uncachedFraction := 1.0 - cachedFraction
+
+		offsetCost := cachedFraction*expectedRuns + uncachedFraction*expectedRuns*r.parentJob.BuildCost + 1
+		noOffsetCost := cachedFraction*expectedRunsOld + uncachedFraction*(expectedRunsOld+1)*r.parentJob.BuildCost
+
+		r.log.Debugf("Expected commits left if we use offset %d: %f. Commits left: Total: %d, Above: %d, Below: %d. Chance of bug being in commit Above: %f, Below: %f. Expected Runs: %f, Expected Runs without Offset: %f. Cached Fraction: %f, Offset Cost: %f, No Offset Cost: %f.", offset, expectedCommits, commitsLeft, commitsAbove, commitsBelow, chanceAbove, chanceBelow, expectedRuns, expectedRunsOld, cachedFraction, offsetCost, noOffsetCost)
+
+		// Make sure that we're actually saving time by reusing this build
+		if noOffsetCost < offsetCost {
+			r.log.Debugf("Would not save time by running offset %d", offset)
+			offset = 0
+		} else {
+			r.log.Debugf("Time saved by running offset %d", offset)
+		}
+	}
+
+	r.log.Debugf("Good commit %d, Bad commit %d, middle commit %d, next commit %d (offset %d)", r.goodCommitOffset, r.badCommitOffset, nextCommit, offsetCommit, offset)
+	return nextCommit + offset
 }
 
 // getOffendingCommit returns the offending commit for the issue bisected by the replica if it was found.
