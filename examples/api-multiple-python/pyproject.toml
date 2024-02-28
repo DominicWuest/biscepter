@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "api-multiple-python"
+version = "0.1.0"
+description = ""
+authors = ["DominicWuest <dominic.wuest@hotmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+biscepter-api-client = {path = "biscepter-api-client"}
+requests = "^2.31.0"
+colorama = "^0.4.6"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
