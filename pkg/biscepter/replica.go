@@ -380,13 +380,38 @@ func (r *replica) getOffendingCommit() *OffendingCommit {
 		return nil
 	}
 
-	// TODO: Check if commit is a merge commit, bisect merge branch if yes
+	commitHash := r.parentJob.commits[r.badCommitOffset]
+
+	// TODO: Maybe toggle this off with a flag? Or specify a max depth of bisecting merges? Also document that octopus merges are not supported.
+	// TODO: Check if commit is a merge commit but no octopus commit, bisect merge branch if yes
+
+	// Get commit's parents to check if it is a merge commit
+	cmd := exec.Command("git", "rev-parse", fmt.Sprintf("%s^@", commitHash))
+	cmd.Dir = r.repoPath
+	outBytes, err := cmd.Output()
+	if err != nil {
+		r.log.Errorf("Couldn't check if commit is merge commit or not - %v", err)
+	} else {
+		out := string(outBytes)
+		// Trim trailing newline
+		parents := strings.Split(out[:len(out)-1], "\n")
+		fmt.Println(parents)
+		if len(parents) == 1 {
+			r.log.Infof("Commit %s is not a merge commit - we found the culprit!", commitHash)
+		} else if len(parents) == 2 {
+			// Merge commit!
+			fmt.Println("Merge commit - we can further bisect")
+		} else {
+			// TODO: Maybe implementable?
+			r.log.Errorf("Commit %s is an octopus commit, further bisection not supported", commitHash)
+		}
+	}
 
 	// Get additional info about the commit
 	var commitMsg, commitDate, commitAuthor string
-	cmd := exec.Command("git", "--no-pager", "show", "-s", "--format=%B%aD%n%an <%ae>", r.parentJob.commits[r.goodCommitOffset])
+	cmd = exec.Command("git", "--no-pager", "show", "-s", "--format=%B%aD%n%an <%ae>", commitHash)
 	cmd.Dir = r.repoPath
-	outBytes, err := cmd.Output()
+	outBytes, err = cmd.Output()
 	if err != nil {
 		r.log.Errorf("Couldn't get additional offending commit info - %v", err)
 	} else {
@@ -405,13 +430,13 @@ func (r *replica) getOffendingCommit() *OffendingCommit {
 		}
 	}
 
-	r.log.Infof("Found offending commit %s with offset %d. Message: %q, Date: %q, Author: %q", r.parentJob.commits[r.goodCommitOffset], r.goodCommitOffset, commitMsg, commitDate, commitAuthor)
+	r.log.Infof("Found offending commit %s with offset %d. Message: %q, Date: %q, Author: %q", commitHash, r.badCommitOffset, commitMsg, commitDate, commitAuthor)
 
 	return &OffendingCommit{
 		ReplicaIndex: r.index,
 
-		Commit:       r.parentJob.commits[r.goodCommitOffset],
-		CommitOffset: r.goodCommitOffset,
+		Commit:       commitHash,
+		CommitOffset: r.badCommitOffset,
 
 		CommitMessage: commitMsg,
 		CommitDate:    commitDate,
