@@ -2,6 +2,7 @@ package biscepter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -154,20 +155,20 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 	cmd := exec.Command("git", "checkout", commitHash)
 	cmd.Dir = r.repoPath
 	if err := cmd.Run(); err != nil {
-		return nil, err
+		return nil, errors.Join(fmt.Errorf("git checkout of hash %s at %s failed failed for replica %d", commitHash, r.repoPath, r.index), err)
 	}
 
 	// Update all submodules
 	cmd = exec.Command("git", "submodule", "update", "--init", "--recursive")
 	cmd.Dir = r.repoPath
 	if err := cmd.Run(); err != nil {
-		return nil, err
+		return nil, errors.Join(fmt.Errorf("git submodule update at %s failed failed for replica %d", r.repoPath, r.index), err)
 	}
 
 	// Create docker client
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(fmt.Errorf("docker client creation failed for replica %d", r.index), err)
 	}
 	defer apiClient.Close()
 
@@ -181,14 +182,14 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 		os.WriteFile(path.Join(r.repoPath, "Dockerfile"), []byte(r.parentJob.dockerfileString), 0777)
 		ctx, err := archive.TarWithOptions(r.repoPath, &archive.TarOptions{})
 		if err != nil {
-			return nil, err
+			return nil, errors.Join(fmt.Errorf("tar creation of dockerfile for commit hash %s failed for replica %d", commitHash, r.index), err)
 		}
 		buildRes, err := apiClient.ImageBuild(context.Background(), ctx, types.ImageBuildOptions{
 			Tags:        []string{imageName},
 			ForceRemove: true,
 		})
 		if err != nil {
-			return nil, err
+			return nil, errors.Join(fmt.Errorf("image build of %s for commit hash %s failed failed for replica %d", imageName, commitHash, r.index), err)
 		}
 		// Wait for build to be done
 		_, err = io.ReadAll(buildRes.Body)
@@ -249,12 +250,12 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 	// Create the new container
 	resp, err := apiClient.ContainerCreate(context.Background(), containerConfig, hostConfig, nil, nil, containerName)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(fmt.Errorf("container creation with name %s of image %s failed failed for replica %d", containerName, imageName, r.index), err)
 	}
 
 	// Start the new container
 	if err := apiClient.ContainerStart(context.Background(), resp.ID, container.StartOptions{}); err != nil {
-		return nil, err
+		return nil, errors.Join(fmt.Errorf("container start with name %s and id %s of image %s failed failed for replica %d", containerName, resp.ID, imageName, r.index), err)
 	}
 
 	r.log.Infof("Started container %s running commit %s, performing healthchecks...", containerName, commitHash)
@@ -263,7 +264,7 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 	for _, healthcheck := range r.parentJob.Healthchecks {
 		success, err := healthcheck.performHealthcheck(ports, r.log)
 		if !success {
-			return nil, fmt.Errorf("healthcheck on port %d failed", healthcheck.Port)
+			return nil, fmt.Errorf("healthcheck on port %d failed failed for replica %d", healthcheck.Port, r.index)
 		} else if err != nil {
 			return nil, err
 		}

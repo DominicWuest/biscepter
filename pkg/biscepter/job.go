@@ -2,6 +2,7 @@ package biscepter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -157,7 +158,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 		return nil, nil, err
 	}
 	if err := exec.Command("git", "clone", job.repository, job.repoPath).Run(); err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Join(fmt.Errorf("git clone of repository %s at %s failed", job.repository, job.repoPath), err)
 	}
 
 	// Make sure there is a path from BadCommit to GoodCommit
@@ -165,7 +166,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	cmd.Dir = job.repoPath
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Join(fmt.Errorf("failed to get rev-list of bad commit %s", job.BadCommit), err)
 	}
 	if !strings.Contains(string(out), job.GoodCommit) {
 		return nil, nil, fmt.Errorf("good commit %s cannot be reached from bad commit %s", job.GoodCommit, job.BadCommit)
@@ -176,7 +177,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	cmd.Dir = job.repoPath
 	out, err = cmd.Output()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Join(fmt.Errorf("failed to get rev-list of bad commit %s to good commit %s", job.BadCommit, job.GoodCommit), err)
 	}
 	job.commits = strings.Split(string(out), "\n")
 
@@ -190,11 +191,11 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	job.builtImages = make(map[string]bool)
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Join(fmt.Errorf("failed to create new docker client"), err)
 	}
 	images, err := cli.ImageList(context.Background(), types.ImageListOptions{})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Join(fmt.Errorf("failed to list all docker images"), err)
 	}
 	for _, image := range images {
 		if len(image.RepoTags) == 1 {
@@ -221,7 +222,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 					return nil, nil, err
 				}
 			}
-			return nil, nil, err
+			return nil, nil, errors.Join(fmt.Errorf("failed to create job replica"), err)
 		}
 
 		// Start the created replica
@@ -229,10 +230,10 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 			// Stop running replicas
 			for j := range i {
 				if err := job.replicas[j].stop(); err != nil {
-					return nil, nil, err
+					return nil, nil, errors.Join(fmt.Errorf("failed to stop job replica %d after start of %d failed", j, i), err)
 				}
 			}
-			return nil, nil, err
+			return nil, nil, errors.Join(fmt.Errorf("failed to start job replica %d", i), err)
 		}
 	}
 
