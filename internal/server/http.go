@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,6 +16,9 @@ type httpServer struct {
 	ocChan chan biscepter.OffendingCommit
 
 	rsMap map[string]biscepter.RunningSystem
+
+	// Channel used to exit the server
+	exitChan chan struct{}
 }
 
 func (h *httpServer) init(port int, rsChan chan biscepter.RunningSystem, ocChan chan biscepter.OffendingCommit) error {
@@ -23,13 +27,25 @@ func (h *httpServer) init(port int, rsChan chan biscepter.RunningSystem, ocChan 
 
 	h.rsMap = make(map[string]biscepter.RunningSystem)
 
+	h.exitChan = make(chan struct{})
+
 	router := gin.Default()
 
 	router.GET("/system", h.getSystem)
 	router.POST("/isGood/:systemId", h.postIsGood)
 	router.POST("/isBad/:systemId", h.postIsBad)
+	router.POST("/stop", h.stop)
 
-	return router.Run(fmt.Sprintf("localhost:%d", port))
+	httpSrv := &http.Server{
+		Addr:    fmt.Sprintf("localhost:%d", port),
+		Handler: router,
+	}
+
+	go httpSrv.ListenAndServe()
+
+	<-h.exitChan
+
+	return httpSrv.Shutdown(context.Background())
 }
 
 type runningSystemResponse struct {
@@ -114,4 +130,9 @@ func (h *httpServer) postIsBad(c *gin.Context) {
 	} else {
 		c.AbortWithStatus(404)
 	}
+}
+
+func (h *httpServer) stop(c *gin.Context) {
+	c.AbortWithStatus(200)
+	h.exitChan <- struct{}{}
 }

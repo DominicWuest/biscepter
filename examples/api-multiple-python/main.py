@@ -2,7 +2,7 @@ import requests
 from biscepter_api_client import Client
 from biscepter_api_client.models import OffendingCommit, RunningSystem
 from biscepter_api_client.types import Response
-from biscepter_api_client.api.default import get_system, post_is_bad_system_id, post_is_good_system_id
+from biscepter_api_client.api.default import get_system, post_is_bad_system_id, post_is_good_system_id, post_stop
 from colorama import Fore, Style
 
 # For pretty printing
@@ -25,6 +25,7 @@ with client as client:
             bisected_issues += 1
             if bisected_issues == 3:
                 print("Finished bisecting all issues!")
+                post_stop.sync_detailed(client=client)
                 exit(0)
         elif isinstance(res, RunningSystem):
             # We got a running system

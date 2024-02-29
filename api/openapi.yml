@@ -47,6 +47,12 @@ paths:
           description: OK
         "404":
           description: A running system with the given system ID was not found
+  /stop:
+    post:
+      summary: Stop the current running job
+      responses:
+        "200":
+          description: OK
 
 components:
   schemas:

@@ -20,10 +20,10 @@ type Server interface {
 func NewServer(serverType ServerType, port int, rsChan chan biscepter.RunningSystem, ocChan chan biscepter.OffendingCommit) error {
 	switch serverType {
 	case Websocket:
-		server := &websocketServer{}
+		var server Server = &websocketServer{}
 		return server.init(port, rsChan, ocChan)
 	case HTTP:
-		server := &httpServer{}
+		var server Server = &httpServer{}
 		return server.init(port, rsChan, ocChan)
 	}
 	return fmt.Errorf("%d is not a valid server type", serverType)

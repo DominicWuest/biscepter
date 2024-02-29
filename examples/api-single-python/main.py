@@ -2,7 +2,7 @@ import requests
 from biscepter_api_client import Client
 from biscepter_api_client.models import OffendingCommit, RunningSystem
 from biscepter_api_client.types import Response
-from biscepter_api_client.api.default import get_system, post_is_bad_system_id, post_is_good_system_id
+from biscepter_api_client.api.default import get_system, post_is_bad_system_id, post_is_good_system_id, post_stop
 
 # Init the API client
 client = Client(base_url="http://localhost:40032")
@@ -16,6 +16,7 @@ with client as client:
             # We got an offending commit
             print("Bisection done! Offending commit", res.commit)
             print("Commit message:", res.commit_message)
+            post_stop.sync_detailed(client=client)
             exit(0)
         elif isinstance(res, RunningSystem):
             # We got a running system
