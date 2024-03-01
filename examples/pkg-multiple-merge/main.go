@@ -58,7 +58,7 @@ func main() {
 		case system := <-rsChan:
 			fmt.Printf("%s%d: Got running system on port %d for replica with index %d%s\n", colors[system.ReplicaIndex], system.ReplicaIndex, system.Ports[3333], system.ReplicaIndex, colorReset)
 
-			res, err := http.Get(fmt.Sprintf("http://localhost:%d/%d", system.Ports[3333], system.ReplicaIndex))
+			res, err := http.Get(fmt.Sprintf("http://localhost:%d/%d", system.Ports[3333], system.ReplicaIndex+3))
 			if err != nil {
 				panic(err)
 			}
