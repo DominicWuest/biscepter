@@ -63,8 +63,7 @@ func (h Healthcheck) performHealthcheck(portsMapping map[int]int, log *logrus.En
 
 		// Manage backoff
 		if (i != h.Config.Retries-1) && !lastSuccess {
-			// TODO: Use logrus.Entry instead of default logger
-			log.Debugf("Healthcheck %d/%d failed. Error: %v. Waiting for %s", i+1, h.Config.Retries, lastError, backoffDuration.String())
+			log.Tracef("Healthcheck %d/%d failed. Error: %v. Waiting for %s", i+1, h.Config.Retries, lastError, backoffDuration.String())
 			time.Sleep(backoffDuration)
 			backoffDuration += h.Config.BackoffIncrement
 			if backoffDuration > h.Config.MaxBackoff {
@@ -78,7 +77,6 @@ func (h Healthcheck) performHealthcheck(portsMapping map[int]int, log *logrus.En
 	}
 
 	if !lastSuccess {
-		// TODO: Use logrus.Entry instead of default logger
 		log.Warnf("Healthcheck %d/%d of type %d failed on port %d which was mapped to %d.", h.Config.Retries, h.Config.Retries, h.CheckType, h.Port, portsMapping[h.Port])
 	}
 
