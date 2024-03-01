@@ -57,7 +57,7 @@ func GetJobFromConfig(r io.Reader) (*Job, error) {
 		Dockerfile:     config.Dockerfile,
 		DockerfilePath: config.DockerfilePath,
 
-		repository: config.Repository,
+		Repository: config.Repository,
 	}
 
 	job.Ports = config.Ports
@@ -122,7 +122,7 @@ type Job struct {
 
 	replicas []*replica // This job's replicas
 
-	repository string // The repository URL
+	Repository string // The repository URL
 	repoPath   string // The path to the original cloned repository which replicas will copy from
 
 	commits []string // This job's commits, where commits[0] is the good commit and commits[N-1] is the bad commit
@@ -154,8 +154,8 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := exec.Command("git", "clone", job.repository, job.repoPath).Run(); err != nil {
-		return nil, nil, errors.Join(fmt.Errorf("git clone of repository %s at %s failed", job.repository, job.repoPath), err)
+	if err := exec.Command("git", "clone", job.Repository, job.repoPath).Run(); err != nil {
+		return nil, nil, errors.Join(fmt.Errorf("git clone of repository %s at %s failed", job.Repository, job.repoPath), err)
 	}
 
 	// Make sure there is a path from BadCommit to GoodCommit
