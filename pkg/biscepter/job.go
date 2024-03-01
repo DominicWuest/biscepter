@@ -125,11 +125,11 @@ type Job struct {
 	repository string // The repository URL
 	repoPath   string // The path to the original cloned repository which replicas will copy from
 
-	commits []string // This job's commits, where commits[0] is the bad commit and commits[N-1] is the good commit
+	commits []string // This job's commits, where commits[0] is the good commit and commits[N-1] is the bad commit
 
 	builtImages map[string]bool // A hashmap where, if a commit exists as a key, this commit's docker image has already been built before
 
-	imagesBuilding map[string]*sync.Mutex // Map of keys for every commit to ensure only one replica is building a specific commit at once
+	imagesBuilding sync.Map // Map of keys for every commit to ensure only one replica is building a specific commit at once
 }
 
 // Run the job. This initializes all the replicas and starts them. This function returns a [RunningSystem] channel and an [OffendingCommit] channel.
@@ -173,18 +173,9 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	}
 
 	// Get all commits
-	cmd = exec.Command("git", "rev-list", "--reverse", "--first-parent", "^"+job.GoodCommit, job.BadCommit)
-	cmd.Dir = job.repoPath
-	out, err = cmd.Output()
+	job.commits, err = getCommitsBetween(job.GoodCommit, job.BadCommit, job.repoPath)
 	if err != nil {
-		return nil, nil, errors.Join(fmt.Errorf("failed to get rev-list of bad commit %s to good commit %s", job.BadCommit, job.GoodCommit), err)
-	}
-	job.commits = strings.Split(string(out), "\n")
-
-	// Initialize the building locks
-	job.imagesBuilding = make(map[string]*sync.Mutex)
-	for _, commit := range job.commits {
-		job.imagesBuilding[commit] = &sync.Mutex{}
+		return nil, nil, fmt.Errorf("couldn't get commits between %s and %s - %v", job.GoodCommit, job.BadCommit, err)
 	}
 
 	// Get all built images
