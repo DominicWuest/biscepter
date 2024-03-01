@@ -19,6 +19,8 @@ jobs:
 
       - name: Lint
         uses: dominikh/staticcheck-action@v1.2.0
+        with:
+          install-go: false
 
       - name: Go Vet
         run: go vet ./...
