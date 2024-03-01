@@ -34,6 +34,8 @@ type replica struct {
 	goodCommitOffset int // The offset to the original bad commit of the newest good commit
 	badCommitOffset  int // The offset to the original bad commit of the oldest bad commit
 
+	commits []string // This replica's commits, where commits[0] is the good commit and commits[N-1] is the bad commit
+
 	waitingCond *sync.Cond // Condition variable used by goroutine created in replica.start to wait until the current commit was reported to be good or bad
 
 	isStopped bool // Whether this replica is running
@@ -62,6 +64,8 @@ func createJobReplica(j *Job, index int) (*replica, error) {
 
 		goodCommitOffset: 0,
 		badCommitOffset:  len(j.commits) - 1,
+
+		commits: j.commits,
 
 		waitingCond: sync.NewCond(&sync.Mutex{}),
 
@@ -114,7 +118,7 @@ func (r *replica) isGood(rs RunningSystem) {
 	if rs.commitRootOffset < r.goodCommitOffset {
 		return
 	}
-	r.goodCommitOffset = rs.commitRootOffset + 1
+	r.goodCommitOffset = rs.commitRootOffset
 
 	go func() {
 		if err := rs.stop(); err != nil {
@@ -149,7 +153,7 @@ func (r *replica) isBad(rs RunningSystem) {
 
 func (r *replica) initNextSystem() (*RunningSystem, error) {
 	nextCommit := r.getNextCommit()
-	commitHash := r.parentJob.commits[nextCommit]
+	commitHash := r.commits[nextCommit]
 
 	// Checkout new commit
 	cmd := exec.Command("git", "checkout", commitHash)
@@ -174,7 +178,10 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 
 	// Build the new image if it doesn't exist yet
 	imageName := "biscepter-" + commitHash
-	r.parentJob.imagesBuilding[commitHash].Lock()
+	newLock := &sync.Mutex{}
+	l, _ := r.parentJob.imagesBuilding.LoadOrStore(commitHash, newLock)
+	lock := l.(*sync.Mutex)
+	lock.Lock()
 	if !r.parentJob.builtImages[imageName] {
 		r.log.Infof("Building image %s of commit %s", imageName, commitHash)
 		// Image has not been built yet
@@ -197,11 +204,11 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 			return nil, err
 		}
 		r.parentJob.builtImages[imageName] = true
-		r.parentJob.imagesBuilding[commitHash].Unlock()
+		lock.Unlock()
 	} else {
 		// Image has been built - reuse it
 		r.log.Infof("Image %s of commit %s already built, reusing image", imageName, commitHash)
-		r.parentJob.imagesBuilding[commitHash].Unlock()
+		lock.Unlock()
 	}
 
 	// Setup the ports
@@ -297,8 +304,8 @@ func (r replica) getNextCommit() int {
 	// Find closest cached build
 	offset := 0
 	for i := 0; i < r.badCommitOffset-nextCommit; i++ {
-		commitAbove := r.parentJob.commits[nextCommit+i]
-		commitBelow := r.parentJob.commits[nextCommit-i]
+		commitAbove := r.commits[nextCommit+i]
+		commitBelow := r.commits[nextCommit-i]
 
 		if r.parentJob.builtImages["biscepter-"+commitAbove] {
 			// If a commit above the middle is built
@@ -346,7 +353,7 @@ func (r replica) getNextCommit() int {
 		// Get the fraction of cached vs uncached commits
 		cached := 0
 		for i := r.badCommitOffset + 1; i < r.goodCommitOffset-1; i++ {
-			if r.parentJob.builtImages["biscepter-"+r.parentJob.commits[i]] {
+			if r.parentJob.builtImages["biscepter-"+r.commits[i]] {
 				cached++
 			}
 		}
@@ -376,42 +383,37 @@ func (r replica) getNextCommit() int {
 // If no offending commit was yet found, returns nil
 func (r *replica) getOffendingCommit() *OffendingCommit {
 	// Offending commit not yet found
-	if r.badCommitOffset != r.goodCommitOffset {
+	if r.badCommitOffset > r.goodCommitOffset+1 {
 		return nil
 	}
 
-	commitHash := r.parentJob.commits[r.badCommitOffset]
+	commitHash := r.commits[r.badCommitOffset]
 
 	// TODO: Maybe toggle this off with a flag? Or specify a max depth of bisecting merges? Also document that octopus merges are not supported.
 	// TODO: Check if commit is a merge commit but no octopus commit, bisect merge branch if yes
 
-	// Get commit's parents to check if it is a merge commit
-	cmd := exec.Command("git", "rev-parse", fmt.Sprintf("%s^@", commitHash))
-	cmd.Dir = r.repoPath
-	outBytes, err := cmd.Output()
+	mergeParent, err := getMergedParent(commitHash, r.commits[r.badCommitOffset-1], r.repoPath)
 	if err != nil {
-		r.log.Errorf("Couldn't check if commit is merge commit or not - %v", err)
-	} else {
-		out := string(outBytes)
-		// Trim trailing newline
-		parents := strings.Split(out[:len(out)-1], "\n")
-		fmt.Println(parents)
-		if len(parents) == 1 {
-			r.log.Infof("Commit %s is not a merge commit - we found the culprit!", commitHash)
-		} else if len(parents) == 2 {
-			// Merge commit!
-			fmt.Println("Merge commit - we can further bisect")
-		} else {
-			// TODO: Maybe implementable?
-			r.log.Errorf("Commit %s is an octopus commit, further bisection not supported", commitHash)
+		r.log.Errorf("Failed to get merge parent of %s - %v", commitHash, err)
+	}
+
+	if mergeParent != "" {
+		r.log.Infof("Offending commit %s is a merge commit. Merged parent: %s", commitHash, mergeParent)
+		var err error
+		r.commits, err = getCommitsBetween(r.commits[r.badCommitOffset-1], mergeParent, r.repoPath)
+		if err != nil {
+			r.log.Panicf("couldn't get replica's merge commits - %v", err)
 		}
+		r.goodCommitOffset = 0
+		r.badCommitOffset = len(r.commits) - 1
+		return nil
 	}
 
 	// Get additional info about the commit
 	var commitMsg, commitDate, commitAuthor string
-	cmd = exec.Command("git", "--no-pager", "show", "-s", "--format=%B%aD%n%an <%ae>", commitHash)
+	cmd := exec.Command("git", "--no-pager", "show", "-s", "--format=%B%aD%n%an <%ae>", commitHash)
 	cmd.Dir = r.repoPath
-	outBytes, err = cmd.Output()
+	outBytes, err := cmd.Output()
 	if err != nil {
 		r.log.Errorf("Couldn't get additional offending commit info - %v", err)
 	} else {
