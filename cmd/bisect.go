@@ -34,13 +34,11 @@ The options include:
 	Run: func(cmd *cobra.Command, args []string) {
 		jobYaml, err := os.Open(args[0])
 		if err != nil {
-			logrus.Errorf("Failed to open job yaml - %v", err)
-			logrus.Exit(1)
+			logrus.Fatalf("Failed to open job yaml - %v", err)
 		}
 		job, err := biscepter.GetJobFromConfig(jobYaml)
 		if err != nil {
-			logrus.Errorf("Failed to read job config from yaml - %v", err)
-			logrus.Exit(1)
+			logrus.Fatalf("Failed to read job config from yaml - %v", err)
 		}
 
 		replicas := 1
@@ -48,8 +46,7 @@ The options include:
 			var err error
 			replicas, err = strconv.Atoi(args[1])
 			if err != nil {
-				logrus.Errorf("%s not a valid argument for amount of replicas", args[1])
-				logrus.Exit(1)
+				logrus.Fatalf("%s not a valid argument for amount of replicas", args[1])
 			}
 		}
 		job.ReplicasCount = replicas
@@ -70,8 +67,7 @@ The options include:
 
 		rsChan, ocChan, err := job.Run()
 		if err != nil {
-			logrus.Errorf("Failed to start job - %v", err)
-			logrus.Exit(1)
+			logrus.Fatalf("Failed to start job - %v", err)
 		}
 
 		serverType := server.HTTP
@@ -80,7 +76,7 @@ The options include:
 		}
 		err = server.NewServer(serverType, bisectPort, rsChan, ocChan)
 		if err != nil {
-			logrus.Errorf("Failed to start webserver - %v", err)
+			logrus.Fatalf("Failed to start webserver - %v", err)
 		}
 	},
 }
