@@ -9,9 +9,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # TODO: Remove once repo is public
-    env:
-      GOPRIVATE: github.com/DominicWuest/biscepter
     steps:
       - uses: actions/checkout@v3
 
