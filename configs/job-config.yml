@@ -10,10 +10,10 @@
 # healthcheck:
 # - port: 3333
 #   type: http
-#   metadata: "/1"
+#   data: "/1"
 # - port: 8080
 #   type: script
-#   metadata: echo "Here"
+#   data: echo "Here"
 # dockerfile: |
 #   FROM golang:1.22.0-alpine
 #   WORKDIR /app

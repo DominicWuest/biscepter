@@ -79,12 +79,11 @@ func GetJobFromConfig(r io.Reader) (*Job, error) {
 			return nil, fmt.Errorf("invalid check type supplied for healthcheck %s", check.Type)
 		}
 
-		// TODO: Implement fully
 		job.Healthchecks = append(job.Healthchecks, Healthcheck{
 			Port:      check.Port,
 			CheckType: checkType,
 
-			Metadata: check.Metadata,
+			Data: check.Data,
 			Config: HealthcheckConfig{
 				Retries: check.Retries,
 

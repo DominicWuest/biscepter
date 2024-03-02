@@ -12,7 +12,7 @@ type healthcheckYaml struct {
 	Port int    `yaml:"port"`
 	Type string `yaml:"type"`
 
-	Metadata string `yaml:"metadata"`
+	Data string `yaml:"data"`
 
 	Retries int `yaml:"retries" default:"25"`
 
@@ -31,23 +31,23 @@ type HealthcheckConfig struct {
 	MaxBackoff       time.Duration // The maximum duration the backoff may reach after incrementing. When the backoff has reached this value, it won't increase any further
 }
 
-// TODO: Docs
+// HealthcheckType specifies the type of healthcheck to be performed
 type HealthcheckType int
 
 const (
-	// Healthcheck consists of a single http GET request. Healthcheck metadata holds the path to which the request is sent
+	// Healthcheck consists of a single http GET request. Healthcheck data holds the path to which the request is sent
 	HttpGet200 HealthcheckType = iota
+	// Healthcheck consists of a custom script ran in bash. Healthcheck data holds the actual script
 	Script
 )
 
-// TODO: Docs
+// The Healthcheck struct represents a healthcheck performed by the replica on running systems before sending them out to be tested
 type Healthcheck struct {
 	Port      int             // The port on which the healthcheck should be performed
 	CheckType HealthcheckType // The type of healthcheck to be performed
 
-	// TODO: Find better name
-	Metadata string            // Additional metadata for a given check type. Functionality depends on check type
-	Config   HealthcheckConfig // The config for this healthcheck
+	Data   string            // Additional data for a given check type. Functionality depends on check type
+	Config HealthcheckConfig // The config for this healthcheck
 }
 
 // performHealthcheck performs the given healthcheck of the passed port mappings.
@@ -89,7 +89,7 @@ func (h Healthcheck) performHealthcheck(portsMapping map[int]int, log *logrus.En
 func (h Healthcheck) performSingleHealthcheck(portsMapping map[int]int) (bool, error) {
 	switch h.CheckType {
 	case HttpGet200:
-		res, err := http.Get(fmt.Sprintf("http://localhost:%d%s", portsMapping[h.Port], h.Metadata))
+		res, err := http.Get(fmt.Sprintf("http://localhost:%d%s", portsMapping[h.Port], h.Data))
 		if err != nil {
 			return false, err
 		}
