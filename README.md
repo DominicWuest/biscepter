@@ -97,4 +97,4 @@ This section contains a list of all supported types of healthchecks, as well as 
 | Type |  Explanation | Data | Data Example |
 | --- | --- | --- | --- |
 | HTTP | This endpoint is considered healthy if it returns a status code of `200` on a GET request. | The path of the URL | "/status" |
-| Script| This endpoint is considered healthy if the script returns with exit code `0`. The variable `$PORT<XXXX>` can be used within the script to get the port to which `<XXXX>` was mapped to on the host (e.g. `$PORT443`). | The script to run | "echo Hello World!" |
+| Script| This endpoint is considered healthy if the script returns with exit code `0`. The environment variable `$PORT<XXXX>` can be used within the script to get the port to which `<XXXX>` was mapped to on the host (e.g. `$PORT443`). | The script to run | "echo Hello World!" |

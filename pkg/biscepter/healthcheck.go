@@ -3,6 +3,7 @@ package biscepter
 import (
 	"fmt"
 	"net/http"
+	"os/exec"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -37,7 +38,8 @@ type HealthcheckType int
 const (
 	// Healthcheck consists of a single http GET request. Healthcheck data holds the path to which the request is sent
 	HttpGet200 HealthcheckType = iota
-	// Healthcheck consists of a custom script ran in bash. Healthcheck data holds the actual script
+	// Healthcheck consists of a custom script ran in bash. Healthcheck data holds the actual script.
+	// The environment variable `$PORT<XXXX>` can be used within the script to get the port to which `<XXXX>` was mapped to on the host (e.g. `$PORT443`)
 	Script
 )
 
@@ -94,6 +96,16 @@ func (h Healthcheck) performSingleHealthcheck(portsMapping map[int]int) (bool, e
 			return false, err
 		}
 		return res.StatusCode == 200, nil
+	case Script:
+		cmd := exec.Command("sh", "-c", h.Data)
+		// Set the ports mapping env variables
+		for k, v := range portsMapping {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("PORT%d=%d", k, v))
+		}
+		if err := cmd.Run(); err != nil {
+			return false, err
+		}
+		return cmd.ProcessState.ExitCode() == 0, nil
 	// TODO: Implement more healthchecks
 	default:
 		panic("unimplemented")
