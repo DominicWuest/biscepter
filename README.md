@@ -23,6 +23,7 @@
 - [⚙️ Installation](#-installation)
 - [📡 API](#-api)
 - [📦 Go Package](#-go-package)
+- [🩺 Healthchecks](#-healthchecks)
 
 </details>
 
@@ -88,3 +89,12 @@ The required fields for a job to run correctly are:
 - `GoodCommit` &amp; `BadCommit`
 - `Dockerfile` or `DockerfilePath`
 - `Repository`
+
+# 🩺 Healthchecks
+
+This section contains a list of all supported types of healthchecks, as well as what the additionally supplied data represents for this healthcheck.
+
+| Type |  Explanation | Data | Data Example |
+| --- | --- | --- | --- |
+| HTTP | This endpoint is considered healthy if it returns a status code of `200` on a GET request. | The path of the URL | "/status" |
+| Script| This endpoint is considered healthy if the script returns with exit code `0`. The variable `$PORT<XXXX>` can be used within the script to get the port to which `<XXXX>` was mapped to on the host (e.g. `$PORT443`). | The script to run | "echo Hello World!" |

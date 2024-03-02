@@ -24,8 +24,6 @@ type jobYaml struct {
 	GoodCommit string `yaml:"goodCommit"`
 	BadCommit  string `yaml:"badCommit"`
 
-	ErrorExitCode int `yaml:"errorExitCode"`
-
 	Port  int   `yaml:"port"`
 	Ports []int `yaml:"ports"`
 

@@ -1,4 +1,3 @@
-# TODO: Add explanations for every key
 # The URL of the repository to bisect
 repository: "git@github.com:DominicWuest/biscepter-test-repo.git"
 # The hash of the good commit, i.e. the commit which does not exhibit any issues
@@ -9,9 +8,6 @@ badCommit: "9b70eda4f3e48d5d906f99b570a16d5a979b0a99"
 # A build cost of 100 means building a commit is 100 times more expensive than running a built commit.
 # A build cost of less than 1 results in biscepter always building the middle commit (if it was not built yet) and not using nearby, cached, builds.
 buildCost: 100
-# The exit code indicating a faulty commit in the dockerfile being built
-# TODO: Add support for this
-errorExitCode: 1
 # The ports that should be exposed on the system under test (this list will be ignored if `port` is set)
 ports:
   - 80
