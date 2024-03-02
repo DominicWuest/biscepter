@@ -13,11 +13,6 @@ import (
 
 var bisectPort int
 
-var (
-	bisectHTTP      bool
-	bisectWebsocket bool
-)
-
 var bisectCmd = &cobra.Command{
 	Use:   "bisect job.yml [replicas]",
 	Short: "Start a server for bisecting an issue based on a job.yml",
@@ -25,11 +20,7 @@ var bisectCmd = &cobra.Command{
 This command optionally takes in an additional value for the amount of replicas should be launched.
 If no value for this is specified, it defaults to one replica.
 
-Calling this command results in a server being created, with whose API the issue(s) can be bisected.
-By default, this will be an HTTP server, but other options also exist.
-The options include:
-	- HTTP
-	- Websocket`,
+Calling this command results in a RESTful HTTP server being created, with whose API the issue(s) can be bisected.`,
 	Args: cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
 		jobYaml, err := os.Open(args[0])
@@ -71,9 +62,6 @@ The options include:
 		}
 
 		serverType := server.HTTP
-		if bisectWebsocket {
-			serverType = server.Websocket
-		}
 		err = server.NewServer(serverType, bisectPort, rsChan, ocChan)
 		if err != nil {
 			logrus.Fatalf("Failed to start webserver - %v", err)
@@ -86,8 +74,6 @@ func init() {
 
 	bisectCmd.Flags().IntVarP(&bisectPort, "port", "p", 40032, "The port on which to start the server")
 
-	bisectCmd.Flags().BoolVar(&bisectHTTP, "http-server", false, "Start an HTTP webserver for handling API requests [default]")
-	bisectCmd.Flags().BoolVar(&bisectWebsocket, "websocket-server", false, "Start a websocket webserver for handling API requests")
 	bisectCmd.MarkFlagsMutuallyExclusive("http-server", "websocket-server")
 
 }

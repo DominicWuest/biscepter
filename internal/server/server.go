@@ -9,8 +9,7 @@ import (
 type ServerType int
 
 const (
-	Websocket ServerType = iota
-	HTTP
+	HTTP ServerType = iota
 )
 
 type Server interface {
@@ -19,9 +18,6 @@ type Server interface {
 
 func NewServer(serverType ServerType, port int, rsChan chan biscepter.RunningSystem, ocChan chan biscepter.OffendingCommit) error {
 	switch serverType {
-	case Websocket:
-		var server Server = &websocketServer{}
-		return server.init(port, rsChan, ocChan)
 	case HTTP:
 		var server Server = &httpServer{}
 		return server.init(port, rsChan, ocChan)
