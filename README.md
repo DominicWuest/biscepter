@@ -1,5 +1,5 @@
 <p align=center>
-  <img alt="Biscepter Logo" height=200 src="https://picsum.photos/200/300"/>
+  <img alt="Biscepter Logo" height=200 src="assets/logo.png"/>
 </p>
 
 <h2 align=center>Biscepter: Efficient Repeated and Concurrent Bisection</h2>
