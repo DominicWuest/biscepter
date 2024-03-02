@@ -103,14 +103,16 @@ func GetJobFromConfig(r io.Reader) (*Job, error) {
 type Job struct {
 	ReplicasCount int // How many replicas of itself this job should spawn simultaneously. Each replica is to be used for bisecting one issue.
 
-	BuildCost float64 // TODO: Explain this precisely
+	// The cost multiplier of building a commit compared to running an already built commit.
+	// A build cost of 100 means building a commit is 100 times more expensive than running a built commit.
+	// A build cost of less than 1 results in biscepter always building the middle commit (if it was not built yet) and not using nearby, cached, builds.
+	BuildCost float64
 
 	Ports        []int         // The ports which this job needs
 	Healthchecks []Healthcheck // The healthchecks for this job
 
-	// TODO: Docs
-	GoodCommit string
-	BadCommit  string
+	GoodCommit string // The hash of the good commit, i.e. the commit which does not exhibit any issues
+	BadCommit  string // The hash of the bad commit, i.e. the commit which exhibits the issue(s) to be bisected
 
 	Dockerfile     string // The contents of the dockerfile.
 	DockerfilePath string // The path to the dockerfile relative to the present working directory. Only gets used if Dockerfile is empty.

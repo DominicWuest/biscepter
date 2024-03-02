@@ -1,24 +1,36 @@
 # TODO: Add explanations for every key
-# repository: "git@github.com:DominicWuest/biscepter-test-repo.git"
-# goodCommit: "ed76c4c1c375d60cc921a819433793126fc6facf"
-# badCommit: "3098191c0b916d209ed371204a07014e0ceb3396"
-# errorExitCode: 1
-# port: 3333
-# ports:
-# - 80
-# - 443
-# healthcheck:
-# - port: 3333
-#   type: http
-#   data: "/1"
-# - port: 8080
-#   type: script
-#   data: echo "Here"
-# dockerfile: |
-#   FROM golang:1.22.0-alpine
-#   WORKDIR /app
-#   COPY . .
-#   CMD go run main.go
-# dockerfilePath: example/Dockerfile
-# dockerfilePathRelative: build/Dockerfile
-# buildCost: 100
+# The URL of the repository to bisect
+repository: "git@github.com:DominicWuest/biscepter-test-repo.git"
+# The hash of the good commit, i.e. the commit which does not exhibit any issues
+goodCommit: "8ee0e2a3c12e324c1b5c41f7861e341d91692efb"
+# The hash of the bad commit, i.e. the commit which exhibits the issue(s) to be bisected
+badCommit: "9b70eda4f3e48d5d906f99b570a16d5a979b0a99"
+# The cost multiplier of building a commit compared to running an already built commit.
+# A build cost of 100 means building a commit is 100 times more expensive than running a built commit.
+# A build cost of less than 1 results in biscepter always building the middle commit (if it was not built yet) and not using nearby, cached, builds.
+buildCost: 100
+# The exit code indicating a faulty commit in the dockerfile being built
+# TODO: Add support for this
+errorExitCode: 1
+# The ports that should be exposed on the system under test (this list will be ignored if `port` is set)
+ports:
+  - 80
+  - 443
+# The port that should be exposed on the system under test (if this is set, the `ports` list will be ignored)
+port: 3333
+# The healthchecks to perform on the system under test before sending it out for testing
+healthcheck:
+  # The port under which the healthcheck should be performed
+  - port: 3333
+    # The type of healthcheck to perform on the port
+    type: http
+    # Additional data for the healthcheck to perform
+    data: "/1"
+# The dockerfile used for building the system (if this is set, `dockerfilePath` will be ignored)
+dockerfile: |
+  FROM golang:1.22.0-alpine
+  WORKDIR /app
+  COPY . .
+  CMD go run main.go
+# The path to the dockerfile used for building the system (this value will be ignored if `dockerfile` is set)
+dockerfilePath: example/Dockerfile
