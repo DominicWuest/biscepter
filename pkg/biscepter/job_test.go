@@ -6,15 +6,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/DominicWuest/biscepter/pkg/biscepter"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
 func bisectTestRepo(t *testing.T, replicas int, endpointOffset int, goodCommit, badCommit string, expectedCommits []string) {
 	job := biscepter.Job{
+		Log:           logrus.StandardLogger(),
 		ReplicasCount: replicas,
 
 		Ports: []int{3333},
@@ -35,6 +38,9 @@ CMD go run main.go
 
 		Repository: "https://github.com/DominicWuest/biscepter-test-repo.git",
 	}
+
+	job.Log.SetLevel(logrus.TraceLevel)
+	job.Log.SetOutput(os.Stdout)
 
 	// Running the job
 	rsChan, ocChan, err := job.Run()
