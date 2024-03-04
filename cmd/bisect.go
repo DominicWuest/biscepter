@@ -73,7 +73,4 @@ func init() {
 	rootCmd.AddCommand(bisectCmd)
 
 	bisectCmd.Flags().IntVarP(&bisectPort, "port", "p", 40032, "The port on which to start the server")
-
-	bisectCmd.MarkFlagsMutuallyExclusive("http-server", "websocket-server")
-
 }
