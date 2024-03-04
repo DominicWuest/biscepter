@@ -33,7 +33,7 @@ COPY . .
 CMD go run main.go
 `,
 
-		Repository: "git@github.com:DominicWuest/biscepter-test-repo.git",
+		Repository: "https://github.com/DominicWuest/biscepter-test-repo.git",
 	}
 
 	// Running the job
