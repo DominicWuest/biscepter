@@ -170,7 +170,7 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 	}
 
 	// Create docker client
-	apiClient, err := client.NewClientWithOpts(client.FromEnv)
+	apiClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, errors.Join(fmt.Errorf("docker client creation failed for replica %d", r.index), err)
 	}
@@ -470,7 +470,7 @@ func (r RunningSystem) IsBad() {
 
 func (r RunningSystem) stop() error {
 	// Create docker client
-	apiClient, err := client.NewClientWithOpts(client.FromEnv)
+	apiClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return err
 	}
