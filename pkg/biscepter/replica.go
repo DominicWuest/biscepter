@@ -307,17 +307,16 @@ func (r replica) getNextCommit() int {
 		commitAbove := r.parentJob.getDockerImageOfCommit(r.commits[nextCommit+i])
 		commitBelow := r.parentJob.getDockerImageOfCommit(r.commits[nextCommit-i])
 
-		if r.parentJob.builtImages["biscepter-"+commitAbove] {
+		if r.parentJob.builtImages[commitAbove] {
 			// If a commit above the middle is built
 			offset = i
 			break
-		} else if r.parentJob.builtImages["biscepter-"+commitBelow] && nextCommit-offset > r.goodCommitOffset {
+		} else if r.parentJob.builtImages[commitBelow] && nextCommit-offset > r.goodCommitOffset {
 			// If a commit below the middle is built. Since nextCommit rounds down, we have to check we're not testing the same commit again
 			offset = -i
 			break
 		}
 	}
-
 	// Check, based on buildCost, whether this offset is worth it
 	/*
 		Definitions:
@@ -353,7 +352,7 @@ func (r replica) getNextCommit() int {
 		// Get the fraction of cached vs uncached commits
 		cached := 0
 		for i := r.badCommitOffset + 1; i < r.goodCommitOffset-1; i++ {
-			if r.parentJob.builtImages["biscepter-"+r.commits[i]] {
+			if r.parentJob.builtImages[r.parentJob.getDockerImageOfCommit(r.commits[i])] {
 				cached++
 			}
 		}
