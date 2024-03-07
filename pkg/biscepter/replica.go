@@ -330,7 +330,7 @@ func (r replica) getNextCommit() int {
 		nOCost := Cost when not using the offset
 
 		oCost = E[o] * c + E[o] * (1 - c) * bC + 1 // +1 since we know the next commit would be cached
-		nOCost = E[nO] * c + E[o] * (1 - c) * bC + bC // +bC since we know the next commit has to be built
+		nOCost = E[nO] * c + E[nO] * (1 - c) * bC + bC // +bC since we know the next commit has to be built
 
 		Use offset, if oCost < nOCost, else don't use the offset
 	*/
