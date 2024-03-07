@@ -114,7 +114,6 @@ func (r *replica) stop() error {
 }
 
 func (r *replica) isGood(rs RunningSystem) {
-	// TODO: Panic if called twice for same commit - Also document in rs.IsGood
 	if rs.commitRootOffset < r.goodCommitOffset {
 		return
 	}
@@ -136,7 +135,6 @@ func (r *replica) isGood(rs RunningSystem) {
 }
 
 func (r *replica) isBad(rs RunningSystem) {
-	// TODO: Panic if called twice for same commit - Also document in rs.IsBad
 	if rs.commitRootOffset > r.badCommitOffset {
 		return
 	}
@@ -466,14 +464,28 @@ type RunningSystem struct {
 
 	commit           string // The current commit
 	commitRootOffset int    // The offset of the current commit to the root commit
+
+	wasRated bool // If this system was already specified to be either good or bad
 }
 
-func (r RunningSystem) IsGood() {
-	r.parentReplica.isGood(r)
+// IsGood tells biscepter that this running system is good.
+// If IsGood is called after the running system was already rated by a previous IsGood or IsBad method invocation, it will panic.
+func (r *RunningSystem) IsGood() {
+	if r.wasRated {
+		panic(fmt.Sprintf("IsGood was called on running system of replica with index %d after it was already rated", r.ReplicaIndex))
+	}
+	r.wasRated = true
+	r.parentReplica.isGood(*r)
 }
 
-func (r RunningSystem) IsBad() {
-	r.parentReplica.isBad(r)
+// IsBad tells biscepter that this running system is bad.
+// If IsBad is called after the running system was already rated by a previous IsGood or IsBad method invocation, it will panic.
+func (r *RunningSystem) IsBad() {
+	if r.wasRated {
+		panic(fmt.Sprintf("IsBad was called on running system of replica with index %d after it was already rated", r.ReplicaIndex))
+	}
+	r.wasRated = true
+	r.parentReplica.isBad(*r)
 }
 
 func (r RunningSystem) stop() error {
