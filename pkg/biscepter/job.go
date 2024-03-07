@@ -11,9 +11,12 @@ import (
 	"sync"
 	"time"
 
+	_ "crypto/sha1"
+
 	"github.com/creasty/defaults"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
@@ -117,7 +120,8 @@ type Job struct {
 
 	Log *logrus.Logger // The log to which information gets printed to
 
-	dockerfileString string
+	dockerfileString string // The parsed dockerfile for building the repository
+	dockerfileHash   string // The hash of the dockerfile string, for differentiating them in built images
 
 	replicas []*replica // This job's replicas
 
@@ -143,7 +147,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	}
 
 	// Populate job.dockerfileBytes, depending on which values were present in the config
-	if err := job.convertDockerfile(); err != nil {
+	if err := job.parseDockerfile(); err != nil {
 		return nil, nil, err
 	}
 
@@ -186,7 +190,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	}
 	for _, image := range images {
 		if len(image.RepoTags) == 1 {
-			job.builtImages[strings.TrimSuffix(image.RepoTags[0], ":latest")] = true
+			job.builtImages[image.RepoTags[0]] = true
 		}
 	}
 	cli.Close()
@@ -238,9 +242,10 @@ func (j *Job) Stop() error {
 	return os.RemoveAll(j.repoPath)
 }
 
-// convertDockerfile sets j.dockerfileString based on the fields set.
-// It prioritizes Dockerfile but uses DockerfilePath if it is empty
-func (j *Job) convertDockerfile() error {
+// parseDockerfile sets j.dockerfileString based on the fields set.
+// It prioritizes Dockerfile but uses DockerfilePath if it is empty.
+// In addition, it sets dockerfileHash
+func (j *Job) parseDockerfile() error {
 	j.dockerfileString = j.Dockerfile
 	if j.dockerfileString == "" {
 		file, err := os.ReadFile(j.DockerfilePath)
@@ -249,5 +254,11 @@ func (j *Job) convertDockerfile() error {
 		}
 		j.dockerfileString = string(file)
 	}
+	j.dockerfileHash = digest.FromString(j.dockerfileString).Encoded()
 	return nil
+}
+
+// getDockerImageOfCommit returns the name with the tag of the docker image which built the passed commit
+func (j *Job) getDockerImageOfCommit(commit string) string {
+	return fmt.Sprintf("biscepter-%s:%s", commit, j.dockerfileHash)
 }

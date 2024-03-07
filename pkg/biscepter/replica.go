@@ -177,7 +177,7 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 	defer apiClient.Close()
 
 	// Build the new image if it doesn't exist yet
-	imageName := "biscepter-" + commitHash
+	imageName := r.parentJob.getDockerImageOfCommit(commitHash)
 	newLock := &sync.Mutex{}
 	l, _ := r.parentJob.imagesBuilding.LoadOrStore(commitHash, newLock)
 	lock := l.(*sync.Mutex)
@@ -304,8 +304,8 @@ func (r replica) getNextCommit() int {
 	// Find closest cached build
 	offset := 0
 	for i := 0; i < r.badCommitOffset-nextCommit; i++ {
-		commitAbove := r.commits[nextCommit+i]
-		commitBelow := r.commits[nextCommit-i]
+		commitAbove := r.parentJob.getDockerImageOfCommit(r.commits[nextCommit+i])
+		commitBelow := r.parentJob.getDockerImageOfCommit(r.commits[nextCommit-i])
 
 		if r.parentJob.builtImages["biscepter-"+commitAbove] {
 			// If a commit above the middle is built
