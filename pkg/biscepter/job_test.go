@@ -16,6 +16,10 @@ buildCost: 42.25
 ports:
   - 80
   - 443
+healthcheck:
+  - port: 1234
+    type: http
+    data: "/status"
 dockerfile: "dockerfile"
 `
 
@@ -28,6 +32,9 @@ dockerfile: "dockerfile"
 	assert.Equal(t, "badCommit", job.BadCommit, "Mismatch in job field")
 	assert.Equal(t, "dockerfile", job.Dockerfile, "Mismatch in job field")
 	assert.Equal(t, "repo", job.Repository, "Mismatch in job field")
+	assert.Equal(t, 1234, job.Healthchecks[0].Port, "Mismatch in job field")
+	assert.Equal(t, HttpGet200, job.Healthchecks[0].CheckType, "Mismatch in job field")
+	assert.Equal(t, "/status", job.Healthchecks[0].Data, "Mismatch in job field")
 }
 
 func TestGetDockerImageOfCommit(t *testing.T) {
