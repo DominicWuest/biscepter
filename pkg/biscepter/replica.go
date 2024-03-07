@@ -351,7 +351,7 @@ func (r replica) getNextCommit() int {
 
 		// Get the fraction of cached vs uncached commits
 		cached := 0
-		for i := r.badCommitOffset + 1; i < r.goodCommitOffset-1; i++ {
+		for i := r.goodCommitOffset + 1; i < r.badCommitOffset-1; i++ {
 			if r.parentJob.builtImages[r.parentJob.getDockerImageOfCommit(r.commits[i])] {
 				cached++
 			}
