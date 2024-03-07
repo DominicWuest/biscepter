@@ -12,6 +12,7 @@ import (
 )
 
 var bisectPort int
+var bisectConcurrency uint
 
 var bisectCmd = &cobra.Command{
 	Use:   "bisect job.yml [replicas]",
@@ -42,6 +43,7 @@ Calling this command results in a RESTful HTTP server being created, with whose 
 		}
 		job.ReplicasCount = replicas
 		job.Log = logrus.New()
+		job.MaxConcurrentReplicas = bisectConcurrency
 
 		// Set logger verbosity
 		if verbosity < 0 {
@@ -73,4 +75,5 @@ func init() {
 	rootCmd.AddCommand(bisectCmd)
 
 	bisectCmd.Flags().IntVarP(&bisectPort, "port", "p", 40032, "The port on which to start the server")
+	bisectCmd.Flags().UintVarP(&bisectConcurrency, "max-concurrency", "c", 0, "The max amount of replicas that can run concurrently, or 0 if no limit")
 }

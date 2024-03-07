@@ -120,6 +120,9 @@ func (r *replica) isGood(rs RunningSystem) {
 	}
 	r.goodCommitOffset = rs.commitRootOffset
 
+	// Release the in initNextSystem acquired semaphore with a weight of 1
+	r.parentJob.replicaSemaphore.Release(1)
+
 	go func() {
 		if err := rs.stop(); err != nil {
 			r.log.Warnf("Failed to stop container %s - %v", rs.containerName, err)
@@ -139,6 +142,9 @@ func (r *replica) isBad(rs RunningSystem) {
 	}
 	r.badCommitOffset = rs.commitRootOffset
 
+	// Release the in initNextSystem acquired semaphore with a weight of 1
+	r.parentJob.replicaSemaphore.Release(1)
+
 	go func() {
 		if err := rs.stop(); err != nil {
 			r.log.Warnf("Failed to stop container %s - %v", rs.containerName, err)
@@ -152,6 +158,9 @@ func (r *replica) isBad(rs RunningSystem) {
 }
 
 func (r *replica) initNextSystem() (*RunningSystem, error) {
+	// Acquire the semaphore with a weight of 1
+	r.parentJob.replicaSemaphore.Acquire(context.Background(), 1)
+
 	nextCommit := r.getNextCommit()
 	commitHash := r.commits[nextCommit]
 

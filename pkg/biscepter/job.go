@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/semaphore"
 	"gopkg.in/yaml.v3"
 )
 
@@ -120,6 +122,9 @@ type Job struct {
 
 	Log *logrus.Logger // The log to which information gets printed to
 
+	MaxConcurrentReplicas uint // The max amount of replicas that can run concurrently, or 0 if no limit
+	replicaSemaphore      *semaphore.Weighted
+
 	dockerfileString string // The parsed dockerfile for building the repository
 	dockerfileHash   string // The hash of the dockerfile string, for differentiating them in built images
 
@@ -145,6 +150,12 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 		job.Log = logrus.New()
 		job.Log.SetOutput(io.Discard)
 	}
+
+	// Init the replica semaphore
+	if job.MaxConcurrentReplicas == 0 {
+		job.MaxConcurrentReplicas = math.MaxInt
+	}
+	job.replicaSemaphore = semaphore.NewWeighted(int64(job.MaxConcurrentReplicas))
 
 	// Populate job.dockerfileBytes, depending on which values were present in the config
 	if err := job.parseDockerfile(); err != nil {
