@@ -8,6 +8,7 @@ require (
 	github.com/docker/docker v25.0.3+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/gin-gonic/gin v1.9.1
+	github.com/manifoldco/promptui v0.9.0
 	github.com/moby/moby v25.0.3+incompatible
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/phayes/freeport v0.0.0-20220201140144-74d24b5ae9f5
@@ -23,6 +24,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
+	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
 	github.com/containerd/containerd v1.7.13 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
