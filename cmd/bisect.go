@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"io"
 	"os"
 	"strconv"
 
@@ -42,21 +41,8 @@ Calling this command results in a RESTful HTTP server being created, with whose 
 			}
 		}
 		job.ReplicasCount = replicas
-		job.Log = logrus.New()
+		job.Log = logrus.StandardLogger()
 		job.MaxConcurrentReplicas = bisectConcurrency
-
-		// Set logger verbosity
-		if verbosity < 0 {
-			job.Log.SetOutput(io.Discard)
-		} else if verbosity == 0 {
-			job.Log.SetLevel(logrus.WarnLevel)
-		} else if verbosity == 1 {
-			job.Log.SetLevel(logrus.InfoLevel)
-		} else if verbosity == 2 {
-			job.Log.SetLevel(logrus.DebugLevel)
-		} else {
-			job.Log.SetLevel(logrus.TraceLevel)
-		}
 
 		rsChan, ocChan, err := job.Run()
 		if err != nil {
