@@ -162,6 +162,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 		return nil, nil, err
 	}
 
+	job.Log.Info("Cloning initial repository...")
 	// Clone repo
 	var err error
 	job.repoPath, err = os.MkdirTemp("", "")
@@ -172,6 +173,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 		return nil, nil, errors.Join(fmt.Errorf("git clone of repository %s at %s failed", job.Repository, job.repoPath), err)
 	}
 
+	job.Log.Info("Checking good and bad commits...")
 	// Make sure there is a path from BadCommit to GoodCommit
 	cmd := exec.Command("git", "rev-list", "--reverse", "--first-parent", job.BadCommit)
 	cmd.Dir = job.repoPath
@@ -183,12 +185,14 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 		return nil, nil, fmt.Errorf("good commit %s cannot be reached from bad commit %s", job.GoodCommit, job.BadCommit)
 	}
 
+	job.Log.Info("Getting all commits...")
 	// Get all commits
 	job.commits, err = getCommitsBetween(job.GoodCommit, job.BadCommit, job.repoPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("couldn't get commits between %s and %s - %v", job.GoodCommit, job.BadCommit, err)
 	}
 
+	job.Log.Info("Getting all built images...")
 	// Get all built images
 	job.builtImages = make(map[string]bool)
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -206,6 +210,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	}
 	cli.Close()
 
+	job.Log.Info("Creating replicas...")
 	// Make the channels
 	// TODO: Don't hardcode channel size
 	rsChan, ocChan := make(chan RunningSystem, 100), make(chan OffendingCommit, 100)
