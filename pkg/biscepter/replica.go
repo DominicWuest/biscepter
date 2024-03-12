@@ -424,7 +424,7 @@ func (r *replica) getOffendingCommit() *OffendingCommit {
 		r.log.Errorf("Couldn't get additional offending commit info - %v", err)
 	} else {
 		out := string(outBytes)
-		if len(out) == 0 || strings.Count(out, "\n") != 3 {
+		if len(out) == 0 || strings.Count(out, "\n") < 3 {
 			r.log.Warnf("Git show output is not of the expected format: %q", out)
 		} else {
 			// Trim trailing newline
