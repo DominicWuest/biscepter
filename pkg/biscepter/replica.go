@@ -318,7 +318,7 @@ func (r replica) getNextCommit() int {
 			// If a commit above the middle is built
 			offset = i
 			break
-		} else if r.parentJob.builtImages[commitBelow] && nextCommit-offset > r.goodCommitOffset {
+		} else if r.parentJob.builtImages[commitBelow] && nextCommit-i > r.goodCommitOffset {
 			// If a commit below the middle is built. Since nextCommit rounds down, we have to check we're not testing the same commit again
 			offset = -i
 			break
