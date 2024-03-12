@@ -207,10 +207,11 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 			return nil, errors.Join(fmt.Errorf("image build of %s for commit hash %s failed for replica %d. Build output: %s", imageName, commitHash, r.index, out), err)
 		}
 		// Wait for build to be done
-		_, err = io.ReadAll(buildRes.Body)
+		out, err := io.ReadAll(buildRes.Body)
 		if err != nil {
 			return nil, err
 		}
+		logrus.Tracef("Image build output:\n%s", string(out))
 		r.parentJob.builtImages[imageName] = true
 		lock.Unlock()
 	} else {
