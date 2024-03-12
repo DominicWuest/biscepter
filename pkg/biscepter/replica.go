@@ -203,7 +203,8 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 			ForceRemove: true,
 		})
 		if err != nil {
-			return nil, errors.Join(fmt.Errorf("image build of %s for commit hash %s failed for replica %d", imageName, commitHash, r.index), err)
+			out, _ := io.ReadAll(buildRes.Body)
+			return nil, errors.Join(fmt.Errorf("image build of %s for commit hash %s failed for replica %d. Build output: %s", imageName, commitHash, r.index, out), err)
 		}
 		// Wait for build to be done
 		_, err = io.ReadAll(buildRes.Body)
