@@ -408,7 +408,7 @@ func (r *replica) getOffendingCommit() *OffendingCommit {
 	if mergeParent != "" {
 		r.log.Infof("Offending commit %s is a merge commit. Merged parent: %s", commitHash, mergeParent)
 		var err error
-		r.commits, err = getCommitsBetween(r.commits[r.badCommitOffset-1], mergeParent, r.repoPath)
+		r.commits, err = getCommitsBetween(r.commits[r.badCommitOffset-1], mergeParent, r.repoPath, r.parentJob.AvoidedCommits)
 		if err != nil {
 			r.log.Panicf("couldn't get replica's merge commits - %v", err)
 		}

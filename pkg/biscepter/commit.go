@@ -8,9 +8,10 @@ import (
 )
 
 // getCommitsBetween returns the hashes of all commits between the passed good and bad commit.
+// The hashes of the commits included in the avoidedCommits argument will not be included in the returned result.
 // The passed commits are included in the result.
 // The returned slice is ordered chronologically, starting from the good commit at index 0 and the bad commit at the last index
-func getCommitsBetween(goodCommitHash, badCommitHash, repoPath string) ([]string, error) {
+func getCommitsBetween(goodCommitHash, badCommitHash, repoPath string, avoidedCommits []string) ([]string, error) {
 	cmd := exec.Command("git", "rev-list", "--reverse", "--first-parent", "^"+goodCommitHash, badCommitHash)
 	cmd.Dir = repoPath
 	out, err := cmd.Output()
@@ -18,6 +19,16 @@ func getCommitsBetween(goodCommitHash, badCommitHash, repoPath string) ([]string
 		return nil, errors.Join(fmt.Errorf("failed to get rev-list of bad commit %s to good commit %s", badCommitHash, goodCommitHash), err)
 	}
 	commits := strings.Split(string(out[:len(out)-1]), "\n")
+
+	// Remove avoided commits from the output
+	for _, avoidedCommit := range avoidedCommits {
+		for i, commit := range commits {
+			if strings.HasPrefix(commit, avoidedCommit) {
+				commits = append(commits[:i], commits[i+1:]...)
+				break
+			}
+		}
+	}
 
 	// Get excluded boundary commit
 	cmd = exec.Command("git", "rev-parse", goodCommitHash)
