@@ -4,9 +4,6 @@ repository: "git@github.com:DominicWuest/biscepter-test-repo.git"
 goodCommit: "8ee0e2a3c12e324c1b5c41f7861e341d91692efb"
 # The hash of the bad commit, i.e. the commit which exhibits the issue(s) to be bisected
 badCommit: "9b70eda4f3e48d5d906f99b570a16d5a979b0a99"
-# The commits that should not be built, but rather avoided, during bisection, for example because they break the build
-avoidedCommits:
-  - "0497a90de62f09ff633dc3618558d9fd4f66089c"
 # The cost multiplier of building a commit compared to running an already built commit.
 # A build cost of 100 means building a commit is 100 times more expensive than running a built commit.
 # A build cost of less than 1 results in biscepter always building the middle commit (if it was not built yet) and not using nearby, cached, builds.

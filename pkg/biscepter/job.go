@@ -29,8 +29,6 @@ type jobYaml struct {
 	GoodCommit string `yaml:"goodCommit"`
 	BadCommit  string `yaml:"badCommit"`
 
-	AvoidedCommits []string `yaml:"avoidedCommits"`
-
 	Port  int   `yaml:"port"`
 	Ports []int `yaml:"ports"`
 
@@ -58,8 +56,6 @@ func GetJobFromConfig(r io.Reader) (*Job, error) {
 
 		GoodCommit: config.GoodCommit,
 		BadCommit:  config.BadCommit,
-
-		AvoidedCommits: config.AvoidedCommits,
 
 		Dockerfile:     config.Dockerfile,
 		DockerfilePath: config.DockerfilePath,
@@ -120,8 +116,6 @@ type Job struct {
 
 	GoodCommit string // The hash of the good commit, i.e. the commit which does not exhibit any issues
 	BadCommit  string // The hash of the bad commit, i.e. the commit which exhibits the issue(s) to be bisected
-
-	AvoidedCommits []string // The hashes of commits that should not be built, but rather avoided, during bisection.
 
 	Dockerfile     string // The contents of the dockerfile.
 	DockerfilePath string // The path to the dockerfile relative to the present working directory. Only gets used if Dockerfile is empty.
