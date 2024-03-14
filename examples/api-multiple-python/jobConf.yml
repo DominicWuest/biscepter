@@ -10,5 +10,6 @@ dockerfile: |
   FROM golang:1.22.0-alpine
   WORKDIR /app
   COPY . .
-  CMD go run main.go
+  RUN go build -o server main.go
+  CMD ./server
 buildCost: 100
