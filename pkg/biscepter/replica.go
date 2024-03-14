@@ -485,7 +485,18 @@ func (r *replica) replaceCommit(commitOffset int) {
 	if commitOffset >= len(r.commits)-1 {
 		logrus.Panicf("Passed commit offset %d to replaceCommit is too large! Max allowed length :%d", commitOffset, len(r.commits)-2)
 	}
+
+	// Get the offset of the actual commit to replace
 	cur := r.commits[commitOffset]
+	for {
+		if val, ok := r.parentJob.commitReplacements.Load(cur); ok {
+			cur = val.(string)
+			commitOffset++
+		} else {
+			break
+		}
+	}
+
 	next := r.commits[commitOffset+1]
 
 	// Store in replacements file for reuse in later runs
