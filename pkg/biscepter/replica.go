@@ -160,7 +160,7 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 	r.parentJob.replicaSemaphore.Acquire(context.Background(), 1)
 
 	nextCommit := r.getNextCommit()
-	commitHash := r.commits[nextCommit]
+	commitHash := getActualCommit(r.commits[nextCommit], r.parentJob.commitReplacements)
 
 	// Checkout new commit
 	cmd := exec.Command("git", "checkout", commitHash)
@@ -204,7 +204,11 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 		})
 		if err != nil {
 			out, _ := io.ReadAll(buildRes.Body)
-			return nil, errors.Join(fmt.Errorf("image build of %s for commit hash %s failed for replica %d. Build output: %s", imageName, commitHash, r.index, out), err)
+			logrus.Warnf("Image build of %s for commit hash %s failed, avoiding commit from now on. Build output: %s", imageName, commitHash, out)
+			r.parentJob.builtImages[imageName] = true
+			r.replaceCommit(nextCommit)
+			lock.Unlock()
+			return r.initNextSystem()
 		}
 		// Wait for build to be done
 		out, err := io.ReadAll(buildRes.Body)
@@ -212,9 +216,26 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 			return nil, err
 		}
 		logrus.Tracef("Image build output:\n%s", string(out))
+
+		// Check if last stream message is an error-detail, meaning the build failed
+		strOut := strings.Split(string(out[:len(out)-1]), "\n")
+		if strings.HasPrefix(strOut[len(strOut)-1], `{"errorDetail"`) {
+			r.log.Warnf("Image build of %s for commit hash %s failed, avoiding commit from now on. Build output: %s", imageName, commitHash, out)
+			r.replaceCommit(nextCommit)
+			// Set to true s.t. waiting replicas don't attempt to rebuild
+			r.parentJob.builtImages[imageName] = true
+			lock.Unlock()
+			return r.initNextSystem()
+		}
 		r.parentJob.builtImages[imageName] = true
 		lock.Unlock()
 	} else {
+		if _, ok := r.parentJob.commitReplacements.Load(commitHash); ok {
+			// Commit breaks the build, init another system
+			r.log.Warnf("Image for commit hash %s reported to be broken, reattempting to init next system.", commitHash)
+			lock.Unlock()
+			return r.initNextSystem()
+		}
 		// Image has been built - reuse it
 		r.log.Infof("Image %s of commit %s already built, reusing image", imageName, commitHash)
 		lock.Unlock()
@@ -408,7 +429,7 @@ func (r *replica) getOffendingCommit() *OffendingCommit {
 	if mergeParent != "" {
 		r.log.Infof("Offending commit %s is a merge commit. Merged parent: %s", commitHash, mergeParent)
 		var err error
-		r.commits, err = getCommitsBetween(r.commits[r.badCommitOffset-1], mergeParent, r.repoPath, r.parentJob.AvoidedCommits)
+		r.commits, err = getCommitsBetween(r.commits[r.badCommitOffset-1], mergeParent, r.repoPath, r.parentJob.commitReplacements)
 		if err != nil {
 			r.log.Panicf("couldn't get replica's merge commits - %v", err)
 		}
@@ -419,7 +440,7 @@ func (r *replica) getOffendingCommit() *OffendingCommit {
 
 	// Get additional info about the commit
 	var commitMsg, commitDate, commitAuthor string
-	cmd := exec.Command("git", "--no-pager", "show", "-s", "--format=%B%aD%n%an <%ae>", commitHash)
+	cmd := exec.Command("git", "--no-pager", "show", "-s", "--format=%B%aD%n%an <%ae>", getActualCommit(commitHash, r.parentJob.commitReplacements))
 	cmd.Dir = r.repoPath
 	outBytes, err := cmd.Output()
 	if err != nil {
@@ -452,6 +473,21 @@ func (r *replica) getOffendingCommit() *OffendingCommit {
 		CommitDate:    commitDate,
 		CommitAuthor:  commitAuthor,
 	}
+}
+
+// replaceCommit makes note of the passed commit as breaking the build.
+// Once the function returns, a replacement commit will have been set in this job's replacementCommit map for the passed commit.
+//
+// Since it is assumed that the ends of the commits slice are commits that build, as they otherwise couldn't have been evaluated, this function panics if
+//
+//	commitOffset >= len(commits) - 1
+func (r *replica) replaceCommit(commitOffset int) {
+	if commitOffset >= len(r.commits)-1 {
+		logrus.Panicf("Passed commit offset %d to replaceCommit is too large! Max allowed length :%d", commitOffset, len(r.commits)-2)
+	}
+	// TODO: Store this persistently
+	next := r.commits[commitOffset+1]
+	r.parentJob.commitReplacements.Store(r.commits[commitOffset], next)
 }
 
 // A RunningSystem is a running system that is ready to be tested

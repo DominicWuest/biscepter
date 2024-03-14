@@ -143,7 +143,9 @@ type Job struct {
 
 	builtImages map[string]bool // A hashmap where, if a commit exists as a key, this commit's docker image has already been built before
 
-	imagesBuilding sync.Map // Map of keys for every commit to ensure only one replica is building a specific commit at once
+	imagesBuilding *sync.Map // Map of keys for every commit to ensure only one replica is building a specific commit at once
+
+	commitReplacements *sync.Map // Map of commits to the commits they should be replaced with. used to avoid commits that break the build
 }
 
 // Run the job. This initializes all the replicas and starts them. This function returns a [RunningSystem] channel and an [OffendingCommit] channel.
@@ -162,6 +164,10 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 		job.MaxConcurrentReplicas = math.MaxInt
 	}
 	job.replicaSemaphore = semaphore.NewWeighted(int64(job.MaxConcurrentReplicas))
+
+	// Init the sync maps
+	job.imagesBuilding = &sync.Map{}
+	job.commitReplacements = &sync.Map{}
 
 	// Populate job.dockerfileBytes, depending on which values were present in the config
 	if err := job.parseDockerfile(); err != nil {
@@ -193,7 +199,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 
 	job.Log.Info("Getting all commits...")
 	// Get all commits
-	job.commits, err = getCommitsBetween(job.GoodCommit, job.BadCommit, job.repoPath, job.AvoidedCommits)
+	job.commits, err = getCommitsBetween(job.GoodCommit, job.BadCommit, job.repoPath, job.commitReplacements)
 	if err != nil {
 		return nil, nil, fmt.Errorf("couldn't get commits between %s and %s - %v", job.GoodCommit, job.BadCommit, err)
 	}

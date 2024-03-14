@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 )
 
 // getCommitsBetween returns the hashes of all commits between the passed good and bad commit.
 // The hashes of the commits included in the avoidedCommits argument will not be included in the returned result.
 // The passed commits are included in the result.
 // The returned slice is ordered chronologically, starting from the good commit at index 0 and the bad commit at the last index
-func getCommitsBetween(goodCommitHash, badCommitHash, repoPath string, avoidedCommits []string) ([]string, error) {
+func getCommitsBetween(goodCommitHash, badCommitHash, repoPath string, commitReplacements *sync.Map) ([]string, error) {
 	cmd := exec.Command("git", "rev-list", "--reverse", "--first-parent", "^"+goodCommitHash, badCommitHash)
 	cmd.Dir = repoPath
 	out, err := cmd.Output()
@@ -20,14 +21,9 @@ func getCommitsBetween(goodCommitHash, badCommitHash, repoPath string, avoidedCo
 	}
 	commits := strings.Split(string(out[:len(out)-1]), "\n")
 
-	// Remove avoided commits from the output
-	for _, avoidedCommit := range avoidedCommits {
-		for i, commit := range commits {
-			if strings.HasPrefix(commit, avoidedCommit) {
-				commits = append(commits[:i], commits[i+1:]...)
-				break
-			}
-		}
+	// Set replacement commits
+	for i, commit := range commits {
+		commits[i] = getActualCommit(commit, commitReplacements)
 	}
 
 	// Get excluded boundary commit
@@ -38,6 +34,14 @@ func getCommitsBetween(goodCommitHash, badCommitHash, repoPath string, avoidedCo
 		return nil, errors.Join(fmt.Errorf("failed to get rev-list of bad commit %s to good commit %s", badCommitHash, goodCommitHash), err)
 	}
 	return append([]string{string(out)[:len(out)-1]}, commits...), nil
+}
+
+// getActualCommit returns the hash of the commit which the passed commit results in, given the passed replacements
+func getActualCommit(commitHash string, commitReplacements *sync.Map) string {
+	if val, ok := commitReplacements.Load(commitHash); ok {
+		return getActualCommit(val.(string), commitReplacements)
+	}
+	return commitHash
 }
 
 // getMergedParent returns the commit hash of the current commit's parent which got merged, given the
