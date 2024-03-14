@@ -19,8 +19,10 @@
 
 <summary><b>Table of Contents</b></summary>
 
-- [🛠️ Why Biscepter over git bisect?](#️-why-biscepter-over-git-bisect)
-- [⚙️ Installation](#-installation)
+<!-- For some reason some of the links need to have this weird prefix, while others don't -->
+
+- [🛠️ Why Biscepter over git bisect?](#%EF%B8%8F-why-biscepter-over-git-bisect)
+- [⚙️ Installation](#%EF%B8%8F-installation)
 - [📡 API](#-api)
 - [📦 Go Package](#-go-package)
 - [🩺 Healthchecks](#-healthchecks)
