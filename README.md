@@ -35,6 +35,7 @@ Biscepter and git bisect may solve the same problem, but biscepter comes with mu
 1. 🗄️ Caching of builds from previous bisects
 1. 🚂 Bisecting multiple issues at once
 1. 🚦 Possibility of prioritizing previously built commits to avoid arduous rebuilding
+1. 🛡️ Automatically remembering and avoiding commits that break the build
 1. 🩺 Easy builtin healthchecks to ensure the system under test is ready
 1. 🐳 Simple definition of builds through Dockerfiles
 
