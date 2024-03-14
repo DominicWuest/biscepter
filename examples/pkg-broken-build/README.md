@@ -14,6 +14,10 @@ However, the build fails, and biscepter now blocks this commit from being built 
 
 This is also concurrency save, meaning a replica attempting to build this broken commit simultaneously to another replica will result in both resorting to using the same replacement commit instead.
 
+Notice that after the first run, a file, `.biscepter-replacements~` is created in your PWD.  
+This file stores the replacements for broken commits, such as `2` in this case.
+When now rerunning the demo, biscepter will already ignore the broken commit and immediately skip to building the replacement instead.
+
 ## Possible Output (Formatted for Clarity)
 
 ```

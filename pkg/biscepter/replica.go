@@ -485,9 +485,15 @@ func (r *replica) replaceCommit(commitOffset int) {
 	if commitOffset >= len(r.commits)-1 {
 		logrus.Panicf("Passed commit offset %d to replaceCommit is too large! Max allowed length :%d", commitOffset, len(r.commits)-2)
 	}
-	// TODO: Store this persistently
+	cur := r.commits[commitOffset]
 	next := r.commits[commitOffset+1]
-	r.parentJob.commitReplacements.Store(r.commits[commitOffset], next)
+
+	// Store in replacements file for reuse in later runs
+	r.parentJob.commitReplacementsBackupFile.WriteString(fmt.Sprintf("%s:%s,", cur, next))
+
+	r.log.Debugf("Adding new replacement: %s -> %s", cur, next)
+
+	r.parentJob.commitReplacements.Store(cur, next)
 }
 
 // A RunningSystem is a running system that is ready to be tested

@@ -140,6 +140,10 @@ type Job struct {
 	imagesBuilding *sync.Map // Map of keys for every commit to ensure only one replica is building a specific commit at once
 
 	commitReplacements *sync.Map // Map of commits to the commits they should be replaced with. used to avoid commits that break the build
+
+	// Path to the file where commit replacements are written to and stored for subsequent runs. Defaults to "$(PWD)/.biscepter-replacements~"
+	CommitReplacementsBackup     string
+	commitReplacementsBackupFile *os.File
 }
 
 // Run the job. This initializes all the replicas and starts them. This function returns a [RunningSystem] channel and an [OffendingCommit] channel.
@@ -163,6 +167,32 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	job.imagesBuilding = &sync.Map{}
 	job.commitReplacements = &sync.Map{}
 
+	// Read in the stored replacements
+	if job.CommitReplacementsBackup == "" {
+		job.CommitReplacementsBackup = ".biscepter-replacements~"
+	}
+	var err error
+	job.commitReplacementsBackupFile, err = os.OpenFile(".biscepter-replacements~", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return nil, nil, errors.Join(fmt.Errorf("couldn't get replacements backup"), err)
+	}
+	replacements, err := os.ReadFile(".biscepter-replacements~")
+	if err != nil {
+		return nil, nil, errors.Join(fmt.Errorf("couldn't read replacements"), err)
+	}
+
+	replacementPairs := strings.Split(strings.TrimSuffix(string(replacements), ","), ",")
+	if replacementPairs[0] != "" {
+		for _, pair := range replacementPairs {
+			split := strings.Split(pair, ":")
+			if len(split) != 2 {
+				return nil, nil, fmt.Errorf("format of replacements file entry incorrect: %s", pair)
+			}
+			job.Log.Debugf("Adding replacement from replacements file: %s -> %s", split[0], split[1])
+			job.commitReplacements.Store(split[0], split[1])
+		}
+	}
+
 	// Populate job.dockerfileBytes, depending on which values were present in the config
 	if err := job.parseDockerfile(); err != nil {
 		return nil, nil, err
@@ -170,7 +200,6 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 
 	job.Log.Info("Cloning initial repository...")
 	// Clone repo
-	var err error
 	job.repoPath, err = os.MkdirTemp("", "")
 	if err != nil {
 		return nil, nil, err
