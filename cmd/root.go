@@ -39,6 +39,9 @@ func Execute() {
 }
 
 func init() {
+	// Hide the completion command
+	rootCmd.CompletionOptions.HiddenDefaultCmd = true
+
 	// Init the logger
 	formatter := prefixed.TextFormatter{
 		TimestampFormat: "15:04:05.000",
