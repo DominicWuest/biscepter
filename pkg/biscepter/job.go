@@ -222,7 +222,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 
 	job.Log.Info("Getting all commits...")
 	// Get all commits
-	job.commits, err = getCommitsBetween(job.GoodCommit, job.BadCommit, job.repoPath, job.commitReplacements)
+	job.commits, err = getCommitsBetween(job.GoodCommit, job.BadCommit, job.repoPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("couldn't get commits between %s and %s - %v", job.GoodCommit, job.BadCommit, err)
 	}
