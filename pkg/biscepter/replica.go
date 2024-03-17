@@ -405,6 +405,7 @@ func (r replica) getNextCommit() int {
 	}
 
 	r.log.Debugf("Good commit %d, Bad commit %d, middle commit %d, next commit %d (offset %d)", r.goodCommitOffset, r.badCommitOffset, nextCommit, offsetCommit, offset)
+	r.log.Infof("Expected amount of runs left: ~%.1f", math.Log2(float64(r.badCommitOffset-r.goodCommitOffset)))
 	return nextCommit + offset
 }
 
