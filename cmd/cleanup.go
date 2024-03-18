@@ -35,8 +35,8 @@ This includes containers, both running and stopped, as well as all docker images
 			All: true,
 			Filters: filters.NewArgs(
 				filters.KeyValuePair{
-					Key:   "name",
-					Value: "biscepter-*",
+					Key:   "label",
+					Value: "biscepter=1",
 				},
 			),
 		})
@@ -48,8 +48,8 @@ This includes containers, both running and stopped, as well as all docker images
 			All: true,
 			Filters: filters.NewArgs(
 				filters.KeyValuePair{
-					Key:   "reference",
-					Value: "biscepter-*",
+					Key:   "label",
+					Value: "biscepter=1",
 				},
 			),
 		})
@@ -99,7 +99,9 @@ This includes containers, both running and stopped, as well as all docker images
 
 		for _, i := range images {
 			logrus.Infof("Deleting image %s (ID: %s)", i.RepoTags[0], i.ID)
-			if _, err := cli.ImageRemove(context.Background(), i.ID, types.ImageRemoveOptions{}); err != nil {
+			if _, err := cli.ImageRemove(context.Background(), i.ID, types.ImageRemoveOptions{
+				PruneChildren: true,
+			}); err != nil {
 				logrus.Fatalf("Failed to remove image with ID %s - %v", i.ID, err)
 			}
 		}
