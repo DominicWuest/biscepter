@@ -201,6 +201,7 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 		buildRes, err := apiClient.ImageBuild(context.Background(), ctx, types.ImageBuildOptions{
 			Tags:        []string{imageName},
 			ForceRemove: true,
+			Labels:      map[string]string{"biscepter": "1"},
 		})
 		if err != nil {
 			out, _ := io.ReadAll(buildRes.Body)
@@ -272,6 +273,7 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 	containerConfig := &container.Config{
 		Image:        imageName,
 		ExposedPorts: exposedPorts,
+		Labels:       map[string]string{"biscepter": "1"},
 	}
 
 	// Setup the host config
