@@ -5,7 +5,7 @@ go 1.22.0
 require (
 	github.com/creasty/defaults v1.7.0
 	github.com/dchest/uniuri v1.2.0
-	github.com/docker/docker v25.0.3+incompatible
+	github.com/docker/docker v25.0.5+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/manifoldco/promptui v0.9.0
