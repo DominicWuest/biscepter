@@ -11,6 +11,7 @@ require (
 	github.com/manifoldco/promptui v0.9.0
 	github.com/moby/moby v25.0.3+incompatible
 	github.com/opencontainers/go-digest v1.0.0
+	github.com/otiai10/copy v1.14.0
 	github.com/phayes/freeport v0.0.0-20220201140144-74d24b5ae9f5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.0

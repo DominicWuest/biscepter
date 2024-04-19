@@ -18,7 +18,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/go-connections/nat"
-	"github.com/moby/moby/daemon/graphdriver/copy"
+	"github.com/otiai10/copy"
 	"github.com/phayes/freeport"
 	"github.com/sirupsen/logrus"
 )
@@ -53,7 +53,10 @@ func createJobReplica(j *Job, index int) (*replica, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := copy.DirCopy(j.repoPath, dir, copy.Content, false); err != nil {
+	if err := copy.Copy(j.repoPath, dir, copy.Options{
+		Specials:     true,
+		NumOfWorkers: int64(j.MaxConcurrentReplicas),
+	}); err != nil {
 		return nil, err
 	}
 
