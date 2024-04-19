@@ -43,6 +43,8 @@ type replica struct {
 	lastRunningSystem *RunningSystem // The last running system created by this replica. Is shut down when the replica is stopped
 
 	log *logrus.Entry
+
+	possibleOtherCommits []string
 }
 
 func createJobReplica(j *Job, index int) (*replica, error) {
@@ -419,12 +421,35 @@ func (r *replica) getOffendingCommit() *OffendingCommit {
 		return nil
 	}
 
-	commitHash := r.commits[r.badCommitOffset]
+	commitHash := getActualCommit(r.commits[r.badCommitOffset], r.parentJob.commitReplacements)
+	prevCommitHash := getActualCommit(r.commits[r.badCommitOffset-1], r.parentJob.commitReplacements)
+
+	// Get all commits that alias to the current one
+	curCommit := commitHash
+	for {
+		found := false
+		r.parentJob.commitReplacements.Range(
+			func(key, value any) bool {
+				commit := key.(string)
+				replacement := value.(string)
+				if replacement == curCommit {
+					curCommit = commit
+					r.possibleOtherCommits = append(r.possibleOtherCommits, commit)
+					found = true
+					return false
+				}
+				return true
+			},
+		)
+		if !found {
+			break
+		}
+	}
 
 	// TODO: Maybe toggle this off with a flag? Or specify a max depth of bisecting merges? Also document that octopus merges are not supported.
 	// TODO: Check if commit is a merge commit but no octopus commit, bisect merge branch if yes
 
-	mergeParent, err := getMergedParent(commitHash, r.commits[r.badCommitOffset-1], r.repoPath)
+	mergeParent, err := getMergedParent(commitHash, prevCommitHash, r.repoPath)
 	if err != nil {
 		r.log.Errorf("Failed to get merge parent of %s - %v", commitHash, err)
 	}
@@ -432,7 +457,7 @@ func (r *replica) getOffendingCommit() *OffendingCommit {
 	if mergeParent != "" {
 		r.log.Infof("Offending commit %s is a merge commit. Merged parent: %s", commitHash, mergeParent)
 		var err error
-		r.commits, err = getCommitsBetween(r.commits[r.badCommitOffset-1], mergeParent, r.repoPath)
+		r.commits, err = getCommitsBetween(prevCommitHash, mergeParent, r.repoPath)
 		if err != nil {
 			r.log.Panicf("couldn't get replica's merge commits - %v", err)
 		}
@@ -475,6 +500,8 @@ func (r *replica) getOffendingCommit() *OffendingCommit {
 		CommitMessage: commitMsg,
 		CommitDate:    commitDate,
 		CommitAuthor:  commitAuthor,
+
+		PossibleOtherCommits: r.possibleOtherCommits,
 	}
 }
 
@@ -570,4 +597,6 @@ type OffendingCommit struct {
 	CommitMessage string // The message of the offending commit
 	CommitDate    string // The date of the offending commit
 	CommitAuthor  string // The author of the offending commit
+
+	PossibleOtherCommits []string // Other possible offending commits. Set if there were build failures causing uncertainty in the exact offending commit
 }
