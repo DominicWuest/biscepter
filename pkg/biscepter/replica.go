@@ -163,17 +163,17 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 	commitHash := getActualCommit(r.commits[nextCommit], r.parentJob.commitReplacements)
 
 	// Checkout new commit
-	cmd := exec.Command("git", "checkout", commitHash)
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("git add . && git reset --hard %s", commitHash))
 	cmd.Dir = r.repoPath
-	if err := cmd.Run(); err != nil {
-		return nil, errors.Join(fmt.Errorf("git checkout of hash %s at %s failed for replica %d", commitHash, r.repoPath, r.index), err)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return nil, errors.Join(fmt.Errorf("git checkout of hash %s at %s failed for replica %d, output: %s", commitHash, r.repoPath, r.index, out), err)
 	}
 
 	// Update all submodules
 	cmd = exec.Command("git", "submodule", "update", "--init", "--recursive")
 	cmd.Dir = r.repoPath
-	if err := cmd.Run(); err != nil {
-		return nil, errors.Join(fmt.Errorf("git submodule update at %s failed for replica %d", r.repoPath, r.index), err)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return nil, errors.Join(fmt.Errorf("git submodule update at %s failed for replica %d, output: %s", r.repoPath, r.index, out), err)
 	}
 
 	// Create docker client
@@ -443,11 +443,11 @@ func (r *replica) getOffendingCommit() *OffendingCommit {
 
 	// Get additional info about the commit
 	var commitMsg, commitDate, commitAuthor string
-	cmd := exec.Command("git", "--no-pager", "show", "-s", "--format=%B%aD%n%an <%ae>", getActualCommit(commitHash, r.parentJob.commitReplacements))
+	cmd := exec.Command("git", "--no-pager", "show", "-s", "--format=%B%n%aD%n%an <%ae>", getActualCommit(commitHash, r.parentJob.commitReplacements))
 	cmd.Dir = r.repoPath
-	outBytes, err := cmd.Output()
+	outBytes, err := cmd.CombinedOutput()
 	if err != nil {
-		r.log.Errorf("Couldn't get additional offending commit info - %v", err)
+		r.log.Errorf("Couldn't get additional offending commit info - %v, output: %s", err, outBytes)
 	} else {
 		out := string(outBytes)
 		if len(out) == 0 || strings.Count(out, "\n") < 3 {
@@ -458,7 +458,7 @@ func (r *replica) getOffendingCommit() *OffendingCommit {
 			authorOffset := strings.LastIndex(out, "\n")
 			dateOffset := strings.LastIndex(out[:authorOffset], "\n")
 
-			commitMsg = out[:dateOffset]
+			commitMsg = strings.TrimSpace(out[:dateOffset])
 			commitDate = out[dateOffset+1 : authorOffset]
 			commitAuthor = out[authorOffset+1:]
 		}

@@ -16,6 +16,7 @@ import (
 
 	"github.com/creasty/defaults"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
@@ -204,17 +205,17 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := exec.Command("git", "clone", job.Repository, job.repoPath).Run(); err != nil {
-		return nil, nil, errors.Join(fmt.Errorf("git clone of repository %s at %s failed", job.Repository, job.repoPath), err)
+	if out, err := exec.Command("git", "clone", job.Repository, job.repoPath).CombinedOutput(); err != nil {
+		return nil, nil, errors.Join(fmt.Errorf("git clone of repository %s at %s failed, output: %s", job.Repository, job.repoPath, out), err)
 	}
 
 	job.Log.Info("Checking good and bad commits...")
 	// Make sure there is a path from BadCommit to GoodCommit
 	cmd := exec.Command("git", "rev-list", "--reverse", "--first-parent", job.BadCommit)
 	cmd.Dir = job.repoPath
-	out, err := cmd.Output()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, nil, errors.Join(fmt.Errorf("failed to get rev-list of bad commit %s", job.BadCommit), err)
+		return nil, nil, errors.Join(fmt.Errorf("failed to get rev-list of bad commit %s, output: %s", job.BadCommit, out), err)
 	}
 	if !strings.Contains(string(out), job.GoodCommit) {
 		return nil, nil, fmt.Errorf("good commit %s cannot be reached from bad commit %s", job.GoodCommit, job.BadCommit)
@@ -234,13 +235,22 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	if err != nil {
 		return nil, nil, errors.Join(fmt.Errorf("failed to create new docker client"), err)
 	}
-	images, err := cli.ImageList(context.Background(), types.ImageListOptions{})
+	images, err := cli.ImageList(context.Background(), types.ImageListOptions{
+		All: true,
+		Filters: filters.NewArgs(
+			filters.KeyValuePair{
+				Key:   "label",
+				Value: "biscepter=1",
+			},
+		),
+	})
 	if err != nil {
 		return nil, nil, errors.Join(fmt.Errorf("failed to list all docker images"), err)
 	}
 	for _, image := range images {
-		if len(image.RepoTags) == 1 {
-			job.builtImages[image.RepoTags[0]] = true
+		for _, tag := range image.RepoTags {
+			logrus.Debugf("Adding new built repo tag: %s", tag)
+			job.builtImages[tag] = true
 		}
 	}
 	cli.Close()

@@ -15,18 +15,18 @@ import (
 func getCommitsBetween(goodCommitHash, badCommitHash, repoPath string) ([]string, error) {
 	cmd := exec.Command("git", "rev-list", "--reverse", "--first-parent", "^"+goodCommitHash, badCommitHash)
 	cmd.Dir = repoPath
-	out, err := cmd.Output()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("failed to get rev-list of bad commit %s to good commit %s", badCommitHash, goodCommitHash), err)
+		return nil, errors.Join(fmt.Errorf("failed to get rev-list of bad commit %s to good commit %s, output: %s", badCommitHash, goodCommitHash, out), err)
 	}
 	commits := strings.Split(string(out[:len(out)-1]), "\n")
 
 	// Get excluded boundary commit
 	cmd = exec.Command("git", "rev-parse", goodCommitHash)
 	cmd.Dir = repoPath
-	out, err = cmd.Output()
+	out, err = cmd.CombinedOutput()
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("failed to get rev-list of bad commit %s to good commit %s", badCommitHash, goodCommitHash), err)
+		return nil, errors.Join(fmt.Errorf("failed to get rev-list of bad commit %s to good commit %s, output: %s", badCommitHash, goodCommitHash, out), err)
 	}
 	return append([]string{string(out)[:len(out)-1]}, commits...), nil
 }
@@ -45,9 +45,9 @@ func getActualCommit(commitHash string, commitReplacements *sync.Map) string {
 func getMergedParent(curCommitHash, parentCommitHash, repoPath string) (string, error) {
 	cmd := exec.Command("git", "rev-parse", fmt.Sprintf("%s^@", curCommitHash))
 	cmd.Dir = repoPath
-	outBytes, err := cmd.Output()
+	outBytes, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("couldn't check if commit is merge commit or not - %v", err)
+		return "", fmt.Errorf("couldn't check if commit is merge commit or not - %v, output: %s", err, outBytes)
 	}
 	out := string(outBytes)
 	// Trim trailing newline
