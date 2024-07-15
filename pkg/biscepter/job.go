@@ -303,6 +303,63 @@ func (j *Job) Stop() error {
 	return os.RemoveAll(j.repoPath)
 }
 
+// RunCommitByOffset starts up a system running the commit whose offset from the good commit is what is specified in the commitOffset argument.
+// This function rerturns an error if commitOffset is less than zero or greater than the amount of commits between the good and bad commits with which the job was initialized.
+//
+// The returned RunningSystem will get terminated once either IsGood or IsBad is called on it.
+//
+// This method blocks until the running system is ready and has passed the healthchecks, or if something went wrong.
+//
+// As an example, for the following git history:
+//
+//	A (good) --- B --- C (bad)
+//
+// Calling this function with offset 0 spins up a system running the commit A, an offset 1 would run commit B and an offset of 2 would result in a system running C.
+func (j *Job) RunCommitByOffset(commitOffset int) (*RunningSystem, error) {
+	if commitOffset < 0 || commitOffset > len(j.commits) {
+		return nil, fmt.Errorf("invalid commit offset passed - %d is not between 0 and %d, the amount of commits", commitOffset, len(j.commits))
+	}
+	return j.RunCommitByHash(j.commits[commitOffset])
+}
+
+// StartUpCommitByOffset starts up a system running the commit with the passed commitHash.
+// The commit hash does not have to be within the good/bad-commits with which the job was initialized.
+// If the commit is not found, an error is returned.
+//
+// The returned RunningSystem will get terminated once either IsGood or IsBad is called on it.
+//
+// This method blocks until the running system is ready and has passed the healthchecks, or if something went wrong.
+func (j *Job) RunCommitByHash(commitHash string) (*RunningSystem, error) {
+	// Copy jobCopy and detach it from current job by reinitializing every pointer field except for imagesBuilding
+	jobCopy := *j
+	jobCopy.Log = &logrus.Logger{Out: io.Discard}
+	jobCopy.replicaSemaphore = semaphore.NewWeighted(math.MaxInt64)
+	jobCopy.commitReplacements = &sync.Map{}
+	jobCopy.replicas = nil
+	// Repeat commitHash thrice, s.t. the replica has to "bisect" it one single time
+	jobCopy.commits = []string{commitHash, commitHash, commitHash}
+
+	rep, err := createJobReplica(&jobCopy, -1)
+	if err != nil {
+		return nil, err
+	}
+
+	rsChan := make(chan RunningSystem)
+	ocChan := make(chan OffendingCommit)
+	if err := rep.start(rsChan, ocChan); err != nil {
+		return nil, err
+	}
+
+	// Ignore ocChan and just stop the replica when done
+	go func(rep *replica, ocChan chan OffendingCommit) {
+		<-ocChan
+		rep.stop()
+	}(rep, ocChan)
+
+	rs := <-rsChan
+	return &rs, nil
+}
+
 // parseDockerfile sets j.dockerfileString based on the fields set.
 // It prioritizes Dockerfile but uses DockerfilePath if it is empty.
 // In addition, it sets dockerfileHash
