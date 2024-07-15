@@ -28,7 +28,9 @@ func getCommitsBetween(goodCommitHash, badCommitHash, repoPath string) ([]string
 	if err != nil {
 		return nil, errors.Join(fmt.Errorf("failed to get rev-list of bad commit %s to good commit %s, output: %s", badCommitHash, goodCommitHash, out), err)
 	}
-	return append([]string{string(out)[:len(out)-1]}, commits...), nil
+	goodBoundaryCommit := string(out)[:len(out)-1]
+
+	return append([]string{goodBoundaryCommit}, commits...), nil
 }
 
 // getActualCommit returns the hash of the commit which the passed commit results in, given the passed replacements
