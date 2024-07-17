@@ -101,6 +101,7 @@ This includes containers, both running and stopped, as well as all docker images
 			logrus.Infof("Deleting image %s (ID: %s)", i.RepoTags[0], i.ID)
 			if _, err := cli.ImageRemove(context.Background(), i.ID, types.ImageRemoveOptions{
 				PruneChildren: true,
+				Force:         true,
 			}); err != nil {
 				logrus.Fatalf("Failed to remove image with ID %s - %v", i.ID, err)
 			}
