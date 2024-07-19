@@ -266,7 +266,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	for i := range job.ReplicasCount {
 		var err error
 		// Create a new replica
-		job.replicas[i], err = createJobReplica(job, i)
+		job.replicas[i], err = createJobReplica(job, i, fmt.Sprint(i))
 		if err != nil {
 			// Stop running replicas
 			for j := range i {
@@ -358,7 +358,7 @@ func (j *Job) RunCommitByHash(commitHash string) (*RunningSystem, error) {
 	// Repeat commitHash thrice, s.t. the replica has to "bisect" it one single time
 	jobCopy.commits = []string{commitHash, commitHash, commitHash}
 
-	rep, err := createJobReplica(jobCopy, -1)
+	rep, err := createJobReplica(jobCopy, -1, commitHash)
 	if err != nil {
 		return nil, err
 	}

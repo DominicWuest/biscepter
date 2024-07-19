@@ -29,6 +29,8 @@ type replica struct {
 
 	index int // Index of this replica in the list of all replicas
 
+	id string // ID of this replica
+
 	repoPath string // The path to this replica's copy of the repo under test
 
 	goodCommitOffset int // The offset to the original bad commit of the newest good commit
@@ -47,7 +49,7 @@ type replica struct {
 	possibleOtherCommits []string
 }
 
-func createJobReplica(j *Job, index int) (*replica, error) {
+func createJobReplica(j *Job, index int, id string) (*replica, error) {
 	// Copy the repo
 	dir, err := os.MkdirTemp("", "")
 	if err != nil {
@@ -64,6 +66,7 @@ func createJobReplica(j *Job, index int) (*replica, error) {
 		parentJob: j,
 
 		index: index,
+		id:    id,
 
 		repoPath: dir,
 
@@ -74,7 +77,7 @@ func createJobReplica(j *Job, index int) (*replica, error) {
 
 		waitingCond: sync.NewCond(&sync.Mutex{}),
 
-		log: j.Log.WithField("replica-index", index),
+		log: j.Log.WithField("replica-id", id),
 	}, nil
 }
 
