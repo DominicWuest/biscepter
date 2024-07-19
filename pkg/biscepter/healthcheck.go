@@ -1,6 +1,7 @@
 package biscepter
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"os/exec"
@@ -79,7 +80,7 @@ func (h Healthcheck) performHealthcheck(portsMapping map[int]int, log *logrus.En
 	}
 
 	if !lastSuccess {
-		log.Warnf("Healthcheck %d/%d of type %d failed on port %d which was mapped to %d.", h.Config.Retries, h.Config.Retries, h.CheckType, h.Port, portsMapping[h.Port])
+		log.Warnf("Healthcheck %d/%d of type %d failed on port %d which was mapped to %d. Last error: %v.", h.Config.Retries, h.Config.Retries, h.CheckType, h.Port, portsMapping[h.Port], lastError)
 	}
 
 	return lastSuccess, lastError
@@ -98,14 +99,20 @@ func (h Healthcheck) performSingleHealthcheck(portsMapping map[int]int) (bool, e
 		return res.StatusCode == 200, nil
 	case Script:
 		cmd := exec.Command("sh", "-c", h.Data)
+		out := new(bytes.Buffer)
+		cmd.Stdout = out
+		cmd.Stderr = out
+
 		// Set the ports mapping env variables
 		for k, v := range portsMapping {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("PORT%d=%d", k, v))
 		}
+
 		if err := cmd.Run(); err != nil {
-			return false, err
+			return false, fmt.Errorf("command didn't exit successfully, error: %v output: %s", err, out)
 		}
-		return cmd.ProcessState.ExitCode() == 0, nil
+
+		return true, nil
 	// TODO: Implement more healthchecks
 	default:
 		panic("unimplemented")
