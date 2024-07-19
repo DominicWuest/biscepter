@@ -331,15 +331,34 @@ func (j *Job) RunCommitByOffset(commitOffset int) (*RunningSystem, error) {
 // This method blocks until the running system is ready and has passed the healthchecks, or if something went wrong.
 func (j *Job) RunCommitByHash(commitHash string) (*RunningSystem, error) {
 	// Copy jobCopy and detach it from current job by reinitializing every pointer field except for imagesBuilding
-	jobCopy := *j
-	jobCopy.Log = &logrus.Logger{Out: io.Discard}
-	jobCopy.replicaSemaphore = semaphore.NewWeighted(math.MaxInt64)
-	jobCopy.commitReplacements = &sync.Map{}
-	jobCopy.replicas = nil
+	jobCopy := &Job{
+		Log: j.Log,
+
+		Repository:    j.Repository,
+		ReplicasCount: 0,
+
+		BuildCost: j.BuildCost,
+
+		Ports:        j.Ports,
+		Healthchecks: j.Healthchecks,
+
+		Dockerfile:     j.Dockerfile,
+		DockerfilePath: j.DockerfilePath,
+
+		CommitReplacementsBackup: j.CommitReplacementsBackup,
+
+		GoodCommit: commitHash,
+		BadCommit:  commitHash,
+	}
+	_, _, err := jobCopy.Run()
+	if err != nil {
+		return nil, err
+	}
+
 	// Repeat commitHash thrice, s.t. the replica has to "bisect" it one single time
 	jobCopy.commits = []string{commitHash, commitHash, commitHash}
 
-	rep, err := createJobReplica(&jobCopy, -1)
+	rep, err := createJobReplica(jobCopy, -1)
 	if err != nil {
 		return nil, err
 	}
