@@ -19,7 +19,10 @@ func getCommitsBetween(goodCommitHash, badCommitHash, repoPath string) ([]string
 	if err != nil {
 		return nil, errors.Join(fmt.Errorf("failed to get rev-list of bad commit %s to good commit %s, output: %s", badCommitHash, goodCommitHash, out), err)
 	}
-	commits := strings.Split(string(out[:len(out)-1]), "\n")
+	commits := []string{}
+	if len(out) != 0 {
+		commits = strings.Split(string(out[:len(out)-1]), "\n")
+	}
 
 	// Get excluded boundary commit
 	cmd = exec.Command("git", "rev-parse", goodCommitHash)
