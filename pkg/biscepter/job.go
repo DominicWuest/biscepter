@@ -201,7 +201,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 
 	job.Log.Info("Cloning initial repository...")
 	// Clone repo
-	job.repoPath, err = os.MkdirTemp("", "")
+	job.repoPath, err = os.MkdirTemp("", "biscepter")
 	if err != nil {
 		return nil, nil, err
 	}

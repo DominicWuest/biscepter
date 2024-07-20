@@ -51,7 +51,7 @@ type replica struct {
 
 func createJobReplica(j *Job, index int, id string) (*replica, error) {
 	// Copy the repo
-	dir, err := os.MkdirTemp("", "")
+	dir, err := os.MkdirTemp("", "biscepter")
 	if err != nil {
 		return nil, err
 	}
