@@ -30,8 +30,9 @@ type jobYaml struct {
 	GoodCommit string `yaml:"goodCommit"`
 	BadCommit  string `yaml:"badCommit"`
 
-	Port  int   `yaml:"port"`
-	Ports []int `yaml:"ports"`
+	Host  string `yaml:"host"`
+	Port  int    `yaml:"port"`
+	Ports []int  `yaml:"ports"`
 
 	Healthcheck []healthcheckYaml `yaml:"healthcheck"`
 
@@ -57,6 +58,8 @@ func GetJobFromConfig(r io.Reader) (*Job, error) {
 
 		GoodCommit: config.GoodCommit,
 		BadCommit:  config.BadCommit,
+
+		Host: config.Host,
 
 		Dockerfile:     config.Dockerfile,
 		DockerfilePath: config.DockerfilePath,
@@ -112,6 +115,9 @@ type Job struct {
 	// A build cost of less than 1 results in biscepter always building the middle commit (if it was not built yet) and not using nearby, cached, builds.
 	BuildCost float64
 
+	// The host to which the docker container ports should be exposed to. Defaults to 127.0.0.1.
+	// If you want the containers to be accessible from everywhere, set this to 0.0.0.0.
+	Host         string
 	Ports        []int         // The ports which this job needs
 	Healthchecks []Healthcheck // The healthchecks for this job
 
@@ -156,6 +162,10 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 		// Mute logger
 		job.Log = logrus.New()
 		job.Log.SetOutput(io.Discard)
+	}
+
+	if job.Host == "" {
+		job.Host = "127.0.0.1"
 	}
 
 	// Init the replica semaphore
@@ -339,6 +349,7 @@ func (j *Job) RunCommitByHash(commitHash string) (*RunningSystem, error) {
 
 		BuildCost: j.BuildCost,
 
+		Host:         j.Host,
 		Ports:        j.Ports,
 		Healthchecks: j.Healthchecks,
 

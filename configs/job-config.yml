@@ -8,6 +8,9 @@ badCommit: "9b70eda4f3e48d5d906f99b570a16d5a979b0a99"
 # A build cost of 100 means building a commit is 100 times more expensive than running a built commit.
 # A build cost of less than 1 results in biscepter always building the middle commit (if it was not built yet) and not using nearby, cached, builds.
 buildCost: 100
+# The host to which the docker container ports should be exposed to. Default 127.0.0.1.
+# If you want the containers to be accessible from everywhere, set this to 0.0.0.0.
+host: 127.0.0.1
 # The ports that should be exposed on the system under test (this list will be ignored if `port` is set)
 ports:
   - 80

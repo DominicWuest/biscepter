@@ -273,7 +273,7 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 		}
 
 		exposedPorts[natPort] = struct{}{}
-		portBindings[natPort] = []nat.PortBinding{{HostPort: fmt.Sprint(freePort)}}
+		portBindings[natPort] = []nat.PortBinding{{HostIP: r.parentJob.Host, HostPort: fmt.Sprint(freePort)}}
 		ports[port] = freePort
 	}
 
