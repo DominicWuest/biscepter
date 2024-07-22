@@ -93,6 +93,9 @@ The required fields for a job to run correctly are:
 - `Dockerfile` or `DockerfilePath`
 - `Repository`
 
+Note that the biscepter package itself does not handle graceful shutdown, and your app should take care of this by calling `job.Stop` at the appropriate time.  
+Failing to do this will lead to docker containers not being stopped, and temporary directories not being deleted, taking up disk space.
+
 # 🩺 Healthchecks
 
 This section contains a list of all supported types of healthchecks, as well as what the additionally supplied data represents for this healthcheck.
