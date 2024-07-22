@@ -173,11 +173,11 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 		job.CommitReplacementsBackup = ".biscepter-replacements~"
 	}
 	var err error
-	job.commitReplacementsBackupFile, err = os.OpenFile(".biscepter-replacements~", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	job.commitReplacementsBackupFile, err = os.OpenFile(job.CommitReplacementsBackup, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return nil, nil, errors.Join(fmt.Errorf("couldn't get replacements backup"), err)
 	}
-	replacements, err := os.ReadFile(".biscepter-replacements~")
+	replacements, err := os.ReadFile(job.CommitReplacementsBackup)
 	if err != nil {
 		return nil, nil, errors.Join(fmt.Errorf("couldn't read replacements"), err)
 	}
@@ -345,7 +345,8 @@ func (j *Job) RunCommitByHash(commitHash string) (*RunningSystem, error) {
 		Dockerfile:     j.Dockerfile,
 		DockerfilePath: j.DockerfilePath,
 
-		CommitReplacementsBackup: j.CommitReplacementsBackup,
+		// If the build breaks, we don't know the replacements, so just ignore
+		CommitReplacementsBackup: "/dev/null",
 
 		GoodCommit: commitHash,
 		BadCommit:  commitHash,
