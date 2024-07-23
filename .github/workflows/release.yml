@@ -2,11 +2,7 @@ name: release
 
 on:
   release:
-    types: [created]
-
-env:
-  GIN_MODE: release
-
+    types: [created, edited]
 
 permissions:
   contents: write
@@ -29,8 +25,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: wangyoucao577/go-release-action@v1.51
+        env:
+          GIN_MODE: release
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           goos: ${{ matrix.goos }}
           goarch: ${{ matrix.goarch }}
           goversion: "1.22.0"
+          overwrite: true
