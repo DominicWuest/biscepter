@@ -217,6 +217,7 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 			r.parentJob.builtImages[imageName] = true
 			r.replaceCommit(nextCommit)
 			lock.Unlock()
+			r.parentJob.replicaSemaphore.Release(1)
 			return r.initNextSystem()
 		}
 		// Wait for build to be done
@@ -234,6 +235,7 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 			// Set to true s.t. waiting replicas don't attempt to rebuild
 			r.parentJob.builtImages[imageName] = true
 			lock.Unlock()
+			r.parentJob.replicaSemaphore.Release(1)
 			return r.initNextSystem()
 		}
 		r.parentJob.builtImages[imageName] = true
@@ -243,6 +245,7 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 			// Commit breaks the build, init another system
 			r.log.Warnf("Image for commit hash %s reported to be broken, reattempting to init next system.", commitHash)
 			lock.Unlock()
+			r.parentJob.replicaSemaphore.Release(1)
 			return r.initNextSystem()
 		}
 		// Image has been built - reuse it
