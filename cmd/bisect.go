@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"context"
 	"os"
+	"os/signal"
+	"runtime/debug"
 	"strconv"
 
 	"github.com/DominicWuest/biscepter/internal/server"
@@ -44,6 +47,30 @@ Calling this command results in a RESTful HTTP server being created, with whose 
 		job.Log = logrus.StandardLogger()
 		job.MaxConcurrentReplicas = bisectConcurrency
 
+		// Handle interrupts
+		jobDoneChan := make(chan struct{})
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer stop()
+		go func() {
+			select {
+			case <-ctx.Done():
+				logrus.Infof("Captured an interrupt signal, commencing graceful shutdown of job. Interrupt again to force shutdown.")
+				stop()
+				gracefulShutdown(job)
+			case <-jobDoneChan:
+			}
+		}()
+
+		// Handle panics
+		defer func() {
+			if r := recover(); r != nil {
+				logrus.Errorf("Captured a panic: %v", r)
+				logrus.Errorf("Stack trace: %s", debug.Stack())
+				logrus.Infof("Attempting to gracefully shut down job")
+				gracefulShutdown(job)
+			}
+		}()
+
 		rsChan, ocChan, err := job.Run()
 		if err != nil {
 			logrus.Fatalf("Failed to start job - %v", err)
@@ -54,6 +81,10 @@ Calling this command results in a RESTful HTTP server being created, with whose 
 		if err != nil {
 			logrus.Fatalf("Failed to start webserver - %v", err)
 		}
+
+		logrus.Infof("Job has finished, shutting down...")
+
+		jobDoneChan <- struct{}{}
 	},
 }
 
@@ -62,4 +93,13 @@ func init() {
 
 	bisectCmd.Flags().IntVarP(&bisectPort, "port", "p", 40032, "The port on which to start the server")
 	bisectCmd.Flags().UintVarP(&bisectConcurrency, "max-concurrency", "c", 0, "The max amount of replicas that can run concurrently, or 0 if no limit")
+}
+
+func gracefulShutdown(job *biscepter.Job) {
+	if err := job.Stop(); err != nil {
+		logrus.Errorf("Failed to gracefully shut down job - %v", err)
+	} else {
+		logrus.Infof("Gracefully shut down job")
+	}
+	os.Exit(1)
 }

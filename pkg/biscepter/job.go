@@ -304,7 +304,8 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 
 // Stop the job and all running replicas.
 func (j *Job) Stop() error {
-	for _, replica := range j.replicas {
+	for i, replica := range j.replicas {
+		j.Log.Infof("Shutting down replica %d", i)
 		if err := replica.stop(); err != nil {
 			return err
 		}
