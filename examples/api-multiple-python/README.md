@@ -20,7 +20,7 @@ To run this example, issue the following commands:
 ```bash
 openapi-python-client generate --path ../../api/openapi.yml # Generate the openAPI python client
 poetry install # Install client
-# In a separate console, run `biscepter bisect` with the jobConf.yml in this directory
+# In a separate console, run `biscepter bisect` with the jobConf.yml in this directory, remember to add an argument of "3" as well to spin up three separate replicas
 poetry run python main.py # Run the API client
 ```
 
