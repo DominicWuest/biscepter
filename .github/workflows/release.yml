@@ -4,6 +4,10 @@ on:
   release:
     types: [created]
 
+env:
+  GIN_MODE: release
+
+
 permissions:
   contents: write
   packages: write
@@ -24,7 +28,7 @@ jobs:
             goos: windows
     steps:
       - uses: actions/checkout@v4
-      - uses: wangyoucao577/go-release-action@v1
+      - uses: wangyoucao577/go-release-action@v1.51
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           goos: ${{ matrix.goos }}
