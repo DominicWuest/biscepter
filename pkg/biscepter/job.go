@@ -386,6 +386,7 @@ func (j *Job) RunCommitByHash(commitHash string) (*RunningSystem, error) {
 	go func(rep *replica, ocChan chan OffendingCommit) {
 		<-ocChan
 		rep.stop()
+		jobCopy.Stop()
 	}(rep, ocChan)
 
 	rs := <-rsChan
