@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -44,7 +43,7 @@ This includes containers, both running and stopped, as well as all docker images
 			logrus.Fatalf("Couldn't list docker containers - %v", err)
 		}
 
-		images, err := cli.ImageList(context.Background(), types.ImageListOptions{
+		images, err := cli.ImageList(context.Background(), image.ListOptions{
 			All: true,
 			Filters: filters.NewArgs(
 				filters.KeyValuePair{
@@ -99,7 +98,7 @@ This includes containers, both running and stopped, as well as all docker images
 
 		for _, i := range images {
 			logrus.Infof("Deleting image %s (ID: %s)", i.RepoTags[0], i.ID)
-			if _, err := cli.ImageRemove(context.Background(), i.ID, types.ImageRemoveOptions{
+			if _, err := cli.ImageRemove(context.Background(), i.ID, image.RemoveOptions{
 				PruneChildren: true,
 				Force:         true,
 			}); err != nil {
