@@ -314,7 +314,9 @@ func (r *replica) initNextSystem() (*RunningSystem, error) {
 	for _, healthcheck := range r.parentJob.Healthchecks {
 		success, err := healthcheck.performHealthcheck(ports, r.log)
 		if !success {
-			return nil, fmt.Errorf("healthcheck on port %d failed for replica %d", healthcheck.Port, r.index)
+			r.replaceCommit(nextCommit)
+			logrus.Warnf("healthcheck on port %d failed for replica %d, treating commit %s as broken", healthcheck.Port, r.index, r.commits[nextCommit])
+			return r.initNextSystem()
 		} else if err != nil {
 			return nil, err
 		}
