@@ -15,8 +15,8 @@ import (
 	_ "crypto/sha1"
 
 	"github.com/creasty/defaults"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
@@ -245,7 +245,7 @@ func (job *Job) Run() (chan RunningSystem, chan OffendingCommit, error) {
 	if err != nil {
 		return nil, nil, errors.Join(fmt.Errorf("failed to create new docker client"), err)
 	}
-	images, err := cli.ImageList(context.Background(), types.ImageListOptions{
+	images, err := cli.ImageList(context.Background(), image.ListOptions{
 		All: true,
 		Filters: filters.NewArgs(
 			filters.KeyValuePair{
