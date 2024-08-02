@@ -29,8 +29,10 @@ func bisectTestRepo(t *testing.T, replicas int, endpointOffset int, goodCommit, 
 		Ports: []int{3333},
 
 		Healthchecks: []biscepter.Healthcheck{
-			{Port: 3333, CheckType: biscepter.HttpGet200, Data: "/1", Config: biscepter.HealthcheckConfig{Retries: 30, Backoff: 2 * time.Second, MaxBackoff: 2 * time.Second}},
+			{Port: 3333, CheckType: biscepter.HttpGet200, Data: "/1", Config: biscepter.HealthcheckConfig{Retries: 50, Backoff: 10 * time.Millisecond, MaxBackoff: 10 * time.Millisecond}},
 		},
+
+		CommitReplacementsBackup: "/dev/null",
 
 		GoodCommit: goodCommit,
 		BadCommit:  badCommit,
@@ -90,6 +92,43 @@ CMD ./server
 	}
 }
 
+// cleanupDocker returns a function which deletes any container and image whose tag is the one passed to this function
+func cleanupDocker(tag string) func() {
+	return func() {
+
+		// Cleanup images and containers
+		cli, _ := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		defer cli.Close()
+
+		// Clean containers
+		containers, _ := cli.ContainerList(context.Background(), container.ListOptions{
+			All: true,
+		})
+		for _, c := range containers {
+			if strings.HasSuffix(c.Image, tag) {
+				cli.ContainerRemove(context.Background(), c.ID, container.RemoveOptions{Force: true})
+			}
+		}
+
+		// Clean images
+		images, _ := cli.ImageList(context.Background(), image.ListOptions{
+			All: true,
+			Filters: filters.NewArgs(
+				filters.KeyValuePair{
+					Key:   "reference",
+					Value: "biscepter-*" + tag,
+				},
+			),
+		})
+		for _, i := range images {
+			cli.ImageRemove(context.Background(), i.ID, image.RemoveOptions{
+				PruneChildren: true,
+				Force:         true,
+			})
+		}
+	}
+}
+
 func TestIntegration(t *testing.T) {
 	t.Run("Bisecting Single Issue", func(t *testing.T) {
 		bisectTestRepo(t,
@@ -131,38 +170,107 @@ func TestIntegration(t *testing.T) {
 		)
 	})
 
-	t.Cleanup(func() {
+	t.Cleanup(cleanupDocker(":13459bf98084bed7c4144d7abdbabb2367585b06136ef2d713a75a4423234656"))
+}
 
-		// Cleanup images and containers
-		cli, _ := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-		defer cli.Close()
+func TestReplacingBrokenCommits(t *testing.T) {
+	t.Parallel()
 
-		// Clean containers
-		containers, _ := cli.ContainerList(context.Background(), container.ListOptions{
-			All: true,
-		})
-		for _, c := range containers {
-			if strings.HasSuffix(c.Image, ":13459bf98084bed7c4144d7abdbabb2367585b06136ef2d713a75a4423234656") {
-				cli.ContainerRemove(context.Background(), c.ID, container.RemoveOptions{Force: true})
-			}
-		}
+	replacements, err := os.CreateTemp("", "")
+	assert.NoError(t, err, "Failed to create tmp file")
 
-		// Clean images
-		images, _ := cli.ImageList(context.Background(), image.ListOptions{
-			All: true,
-			Filters: filters.NewArgs(
-				filters.KeyValuePair{
-					Key:   "reference",
-					Value: "biscepter-*:13459bf98084bed7c4144d7abdbabb2367585b06136ef2d713a75a4423234656",
-				},
-			),
-		})
-		for _, i := range images {
-			cli.ImageRemove(context.Background(), i.ID, image.RemoveOptions{
-				PruneChildren: true,
-				Force:         true,
-			})
-		}
+	job := biscepter.Job{
+		Log:           logrus.StandardLogger(),
+		ReplicasCount: 1,
 
-	})
+		Ports: []int{3333},
+
+		Healthchecks: []biscepter.Healthcheck{
+			{Port: 3333, CheckType: biscepter.HttpGet200, Data: "/1", Config: biscepter.HealthcheckConfig{Retries: 50, Backoff: 10 * time.Millisecond, MaxBackoff: 10 * time.Millisecond}},
+		},
+
+		GoodCommit: "8ee0e2a3c12e324c1b5c41f7861e341d91692efb",
+		BadCommit:  "9b70eda4f3e48d5d906f99b570a16d5a979b0a99",
+
+		CommitReplacementsBackup: replacements.Name(),
+
+		Dockerfile: `
+FROM golang:1.22.0-alpine
+WORKDIR /app
+RUN apk add git
+COPY . .
+RUN [[ $(git rev-parse HEAD) != "03cdf844a180c44763e12f29901ab5f8d61444f3" ]]
+RUN go build -o server main.go
+CMD ./server
+`,
+
+		Repository: "https://github.com/DominicWuest/biscepter-test-repo.git",
+	}
+
+	// Run job whose build fails on commit 03cdf844a180c44763e12f29901ab5f8d61444f3, which is the first commit to be tested
+	rsChan, _, err := job.Run()
+	assert.NoError(t, err, "Failed to start job")
+
+	// Block until the first container is ready
+	<-rsChan
+
+	// Make sure the commit replacement is set correctly
+	out, err := io.ReadAll(replacements)
+	assert.Equal(t, "03cdf844a180c44763e12f29901ab5f8d61444f3:22a405d30a6c8d3eb045062ac2be4cff57e30d29,", string(out), "Commit replacement set incorrectly")
+
+	os.Remove(replacements.Name())
+
+	job.Stop()
+
+	cleanupDocker(":93e3bf8b4be27be133c0d4740e936aa19e2aa52fff5e96f418669eb28ac8616b")()
+}
+
+func TestReplacingBrokenHealthcheck(t *testing.T) {
+	t.Parallel()
+
+	replacements, err := os.CreateTemp("", "")
+	assert.NoError(t, err, "Failed to create tmp file")
+
+	job := biscepter.Job{
+		Log:           logrus.StandardLogger(),
+		ReplicasCount: 1,
+
+		Ports: []int{3333},
+
+		Healthchecks: []biscepter.Healthcheck{
+			{Port: 3333, CheckType: biscepter.HttpGet200, Data: "/1", Config: biscepter.HealthcheckConfig{Retries: 50, Backoff: 10 * time.Millisecond, MaxBackoff: 10 * time.Millisecond}},
+		},
+
+		GoodCommit: "8ee0e2a3c12e324c1b5c41f7861e341d91692efb",
+		BadCommit:  "9b70eda4f3e48d5d906f99b570a16d5a979b0a99",
+
+		CommitReplacementsBackup: replacements.Name(),
+
+		Dockerfile: `
+FROM golang:1.22.0-alpine
+WORKDIR /app
+RUN apk add git
+COPY . .
+RUN go build -o server main.go
+CMD [[ $(git rev-parse HEAD) != "03cdf844a180c44763e12f29901ab5f8d61444f3" ]] && ./server
+`,
+
+		Repository: "https://github.com/DominicWuest/biscepter-test-repo.git",
+	}
+
+	// Run job whose CMD fails on commit 03cdf844a180c44763e12f29901ab5f8d61444f3, which is the first commit to be tested
+	// This means the build will succeed but the healthcheck won't
+	rsChan, _, err := job.Run()
+	assert.NoError(t, err, "Failed to start job")
+
+	// Block until the first container is ready
+	<-rsChan
+
+	// Make sure the commit replacement is set correctly
+	out, err := io.ReadAll(replacements)
+	assert.Equal(t, "03cdf844a180c44763e12f29901ab5f8d61444f3:22a405d30a6c8d3eb045062ac2be4cff57e30d29,", string(out), "Commit replacement set incorrectly")
+
+	os.Remove(replacements.Name())
+	job.Stop()
+	cleanupDocker(":00b975cbd39dbd1f1fb2010a7015792206dd562755262667a8c98d4f33427388")()
 }
