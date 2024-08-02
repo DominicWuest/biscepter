@@ -3,14 +3,20 @@
 package biscepter_test
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/DominicWuest/biscepter/pkg/biscepter"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/client"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -33,7 +39,8 @@ func bisectTestRepo(t *testing.T, replicas int, endpointOffset int, goodCommit, 
 FROM golang:1.22.0-alpine
 WORKDIR /app
 COPY . .
-CMD go run main.go
+RUN go build -o server main.go
+CMD ./server
 `,
 
 		Repository: "https://github.com/DominicWuest/biscepter-test-repo.git",
@@ -122,5 +129,40 @@ func TestIntegration(t *testing.T) {
 				"cfad207f7deb9beb6855bc050d20d721945d30df",
 			},
 		)
+	})
+
+	t.Cleanup(func() {
+
+		// Cleanup images and containers
+		cli, _ := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		defer cli.Close()
+
+		// Clean containers
+		containers, _ := cli.ContainerList(context.Background(), container.ListOptions{
+			All: true,
+		})
+		for _, c := range containers {
+			if strings.HasSuffix(c.Image, ":13459bf98084bed7c4144d7abdbabb2367585b06136ef2d713a75a4423234656") {
+				cli.ContainerRemove(context.Background(), c.ID, container.RemoveOptions{Force: true})
+			}
+		}
+
+		// Clean images
+		images, _ := cli.ImageList(context.Background(), image.ListOptions{
+			All: true,
+			Filters: filters.NewArgs(
+				filters.KeyValuePair{
+					Key:   "reference",
+					Value: "biscepter-*:13459bf98084bed7c4144d7abdbabb2367585b06136ef2d713a75a4423234656",
+				},
+			),
+		})
+		for _, i := range images {
+			cli.ImageRemove(context.Background(), i.ID, image.RemoveOptions{
+				PruneChildren: true,
+				Force:         true,
+			})
+		}
+
 	})
 }
