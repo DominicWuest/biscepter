@@ -317,6 +317,8 @@ func (j *Job) Stop() error {
 // RunCommitByOffset starts up a system running the commit whose offset from the good commit is what is specified in the commitOffset argument.
 // This function rerturns an error if commitOffset is less than zero or greater than the amount of commits between the good and bad commits with which the job was initialized.
 //
+// This method errors if the passed job hasn't yet been initialized using [Job.Run].
+//
 // The returned RunningSystem will get terminated once either IsGood or IsBad is called on it.
 //
 // This method blocks until the running system is ready and has passed the healthchecks, or if something went wrong.
@@ -327,15 +329,22 @@ func (j *Job) Stop() error {
 //
 // Calling this function with offset 0 spins up a system running the commit A, an offset 1 would run commit B and an offset of 2 would result in a system running C.
 func (j *Job) RunCommitByOffset(commitOffset int) (*RunningSystem, error) {
+	if len(j.commits) == 0 {
+		return nil, fmt.Errorf("job doesn't contain any commits. Have you initialized the passed job yet?")
+	}
+
 	if commitOffset < 0 || commitOffset > len(j.commits) {
 		return nil, fmt.Errorf("invalid commit offset passed - %d is not between 0 and %d, the amount of commits", commitOffset, len(j.commits))
 	}
+
 	return j.RunCommitByHash(j.commits[commitOffset])
 }
 
 // StartUpCommitByOffset starts up a system running the commit with the passed commitHash.
 // The commit hash does not have to be within the good/bad-commits with which the job was initialized.
 // If the commit is not found, an error is returned.
+//
+// This method doesn't require the passed job to have been initialized using [Job.Run].
 //
 // The returned RunningSystem will get terminated once either IsGood or IsBad is called on it.
 //
