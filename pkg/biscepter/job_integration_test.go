@@ -274,3 +274,53 @@ CMD [[ $(git rev-parse HEAD) != "03cdf844a180c44763e12f29901ab5f8d61444f3" ]] &&
 	job.Stop()
 	cleanupDocker(":00b975cbd39dbd1f1fb2010a7015792206dd562755262667a8c98d4f33427388")()
 }
+
+func TestRunCommitByOffset(t *testing.T) {
+	job := biscepter.Job{
+		Log:           logrus.StandardLogger(),
+		ReplicasCount: 0,
+
+		Ports: []int{3333},
+
+		Healthchecks: []biscepter.Healthcheck{
+			{CheckType: biscepter.Script, Data: "true", Config: biscepter.HealthcheckConfig{Retries: 50, Backoff: 10 * time.Millisecond, MaxBackoff: 10 * time.Millisecond}},
+		},
+
+		CommitReplacementsBackup: "/dev/null",
+
+		GoodCommit: "8ee0e2a3c12e324c1b5c41f7861e341d91692efb",
+		BadCommit:  "9b70eda4f3e48d5d906f99b570a16d5a979b0a99",
+
+		Dockerfile: `FROM golang:1.22.0-alpine`,
+
+		Repository: "https://github.com/DominicWuest/biscepter-test-repo.git",
+	}
+
+	_, err := job.RunCommitByOffset(1)
+	assert.Error(t, err, "Valid commit didn't raise an error on an unitialized job")
+
+	_, _, err = job.Run()
+	assert.NoError(t, err, "Job failed to initialize")
+
+	t.Run("Negative commit offset errors", func(t *testing.T) {
+		t.Parallel()
+		_, err := job.RunCommitByOffset(-1)
+		assert.Error(t, err, "Negative commit offset didn't raise an error")
+	})
+
+	t.Run("Out of bounds commit offset errors", func(t *testing.T) {
+		t.Parallel()
+		_, err := job.RunCommitByOffset(100)
+		assert.Error(t, err, "Commit offset that is out of bounds didn't raise an error")
+	})
+
+	t.Run("Valid commit offset doesn't error", func(t *testing.T) {
+		t.Parallel()
+		rs, err := job.RunCommitByOffset(1)
+		assert.NoError(t, err, "Valid commit offset caused an error")
+
+		rs.IsGood()
+	})
+
+	t.Cleanup(cleanupDocker(":b306a8132f4a6eaf8f97a8f383ca81d64776f6f0b112cfab96789b54908043a9"))
+}
