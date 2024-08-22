@@ -72,6 +72,10 @@ func GetJobFromConfig(r io.Reader) (*Job, error) {
 		job.Ports = []int{config.Port}
 	}
 
+	if len(job.Ports) == 0 {
+		return nil, fmt.Errorf("no port specified for job")
+	}
+
 	// Set all the healthchecks
 	checkTypes := map[string]HealthcheckType{
 		"http":   HttpGet200,
@@ -84,6 +88,10 @@ func GetJobFromConfig(r io.Reader) (*Job, error) {
 		checkType, ok := checkTypes[strings.ToLower(check.Type)]
 		if !ok {
 			return nil, fmt.Errorf("invalid check type supplied for healthcheck %s", check.Type)
+		}
+
+		if check.Port == 0 {
+			return nil, fmt.Errorf("no port specified for healthcheck %#v", check)
 		}
 
 		job.Healthchecks = append(job.Healthchecks, Healthcheck{

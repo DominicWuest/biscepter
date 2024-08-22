@@ -283,7 +283,7 @@ func TestRunCommitByOffset(t *testing.T) {
 		Ports: []int{3333},
 
 		Healthchecks: []biscepter.Healthcheck{
-			{CheckType: biscepter.Script, Data: "true", Config: biscepter.HealthcheckConfig{Retries: 50, Backoff: 10 * time.Millisecond, MaxBackoff: 10 * time.Millisecond}},
+			{CheckType: biscepter.Script, Port: 3333, Data: "true", Config: biscepter.HealthcheckConfig{Retries: 50, Backoff: 10 * time.Millisecond, MaxBackoff: 10 * time.Millisecond}},
 		},
 
 		CommitReplacementsBackup: "/dev/null",
